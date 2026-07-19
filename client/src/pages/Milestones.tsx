@@ -431,7 +431,7 @@ export const Milestones: React.FC = () => {
             {/* Modal Header */}
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
               <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">
-                Create New Milestone
+                Create New 
               </h3>
               <button 
                 onClick={() => setIsModalOpen(false)}
