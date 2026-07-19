@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0B0E11;
+  --color-panel: #14181D;
+  
+  --color-accent: #22D3EE;
+  --color-accent-hover: #0891B2;
+  --color-accent-dark: #0E7490;
+  
+  --color-category-DSA: #3B82F6;
+  --color-category-SYSTEM_DESIGN: #A855F7;
+  --color-category-AI_AGENTIC: #22D3EE;
+  --color-category-PROJECT: #22C55E;
+  --color-category-APPLICATIONS: #F97316;
+  --color-category-OTHER: #64748B;
+  
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "Inter", system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: #f1f5f9; /* slate-100 */
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Scrollbar Styling for Ops Aesthetic */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-background);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1e293b; /* slate-800 */
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #334155; /* slate-750 */
+  }
+}

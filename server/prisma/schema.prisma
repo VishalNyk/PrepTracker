@@ -1,0 +1,108 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model ActivityLog {
+  id          Int      @id @default(autoincrement())
+  date        DateTime // date only, no time component needed logically
+  category    Category
+  topic       String?  // free text, e.g. "Graphs - BFS/DFS"
+  durationMin Int
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+}
+
+model Milestone {
+  id           Int              @id @default(autoincrement())
+  title        String
+  category     Category
+  targetDate   DateTime
+  status       MilestoneStatus  @default(NOT_STARTED)
+  progressPct  Int              @default(0) // 0-100, can be auto-derived from tasks
+  createdAt    DateTime         @default(now())
+  tasks        MilestoneTask[]
+}
+
+model MilestoneTask {
+  id          Int       @id @default(autoincrement())
+  milestoneId Int
+  milestone   Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  title       String
+  isDone      Boolean   @default(false)
+  order       Int       @default(0)
+}
+
+model TopicCategory {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
+
+model Topic {
+  id             Int           @id @default(autoincrement())
+  category       String
+  name           String
+  masteryLevel   MasteryLevel  @default(NOT_STARTED)
+  lastPracticed  DateTime?
+  notes          String?       @db.Text
+  topicNotes     TopicNote[]
+}
+
+model TopicNote {
+  id        Int      @id @default(autoincrement())
+  topicId   Int
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  title     String
+  content   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Application {
+  id            Int               @id @default(autoincrement())
+  companyName   String
+  role          String
+  tier          Int               @default(1) // 1, 2, or 3 — your personal priority priority tier
+  status        ApplicationStatus @default(APPLIED)
+  appliedDate   DateTime
+  lastUpdate    DateTime          @default(now())
+  notes         String?           @db.Text
+}
+
+enum Category {
+  DSA
+  SYSTEM_DESIGN
+  AI_AGENTIC
+  PROJECT
+  APPLICATIONS
+  CLOUD_NATIVE_COMPUTING
+  OTHER
+}
+
+enum MilestoneStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+}
+
+enum MasteryLevel {
+  NOT_STARTED
+  LEARNING
+  PRACTICING
+  CONFIDENT
+  MASTERED
+}
+
+enum ApplicationStatus {
+  APPLIED
+  OA
+  INTERVIEW
+  OFFER
+  REJECTED
+  GHOSTED
+}
