@@ -266,6 +266,37 @@ export const Topics: React.FC = () => {
     if (!editorRef.current) return;
     event.preventDefault();
 
+    const items = event.clipboardData.items;
+    let containsImage = false;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') === 0) {
+        containsImage = true;
+        break;
+      }
+    }
+
+    if (containsImage) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf('image') === 0) {
+          const file = item.getAsFile();
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const base64 = e.target?.result as string;
+              if (base64) {
+                const imgHtml = `<img src="${base64}" style="max-width: 100%; height: auto; border-radius: 0.375rem; display: block; margin: 0.5rem 0;" />`;
+                document.execCommand('insertHTML', false, imgHtml);
+                syncEditorContent();
+              }
+            };
+            reader.readAsDataURL(file);
+          }
+        }
+      }
+      return;
+    }
+
     const clipboardHtml = event.clipboardData.getData('text/html');
     const clipboardText = event.clipboardData.getData('text/plain');
     const sanitizeNode = (node: Node): Node | null => {
@@ -278,6 +309,21 @@ export const Topics: React.FC = () => {
 
       const element = node as HTMLElement;
       const tag = element.tagName.toLowerCase();
+
+      if (tag === 'img') {
+        const imgElement = document.createElement('img');
+        const srcAttr = element.getAttribute('src');
+        if (srcAttr) {
+          imgElement.src = srcAttr;
+        }
+        imgElement.style.maxWidth = '100%';
+        imgElement.style.height = 'auto';
+        imgElement.style.borderRadius = '0.375rem';
+        imgElement.style.display = 'block';
+        imgElement.style.margin = '0.5rem 0';
+        return imgElement;
+      }
+
       const allowedTags = ['b', 'strong', 'i', 'em', 'u', 'br', 'p', 'div', 'span', 'ul', 'ol', 'li'];
       const sanitizedElement = document.createElement(allowedTags.includes(tag) ? tag : 'span');
 

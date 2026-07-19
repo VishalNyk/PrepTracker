@@ -29,7 +29,9 @@ export const ActivityLogPage: React.FC = () => {
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<string>('ALL');
   
   // Quick-add form states
-  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState<string>(
+    new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]
+  );
   const [category, setCategory] = useState<Category>('DSA');
   const [topic, setTopic] = useState<string>('');
   const [durationMin, setDurationMin] = useState<number>(45);

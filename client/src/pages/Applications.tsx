@@ -40,7 +40,9 @@ export const Applications: React.FC = () => {
   const [role, setRole] = useState('');
   const [tier, setTier] = useState<number>(1);
   const [status, setStatus] = useState<ApplicationStatus>('APPLIED');
-  const [appliedDate, setAppliedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [appliedDate, setAppliedDate] = useState<string>(
+    new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]
+  );
   const [notes, setNotes] = useState('');
 
   // Fetch Applications
@@ -80,7 +82,7 @@ export const Applications: React.FC = () => {
       setRole('');
       setTier(1);
       setStatus('APPLIED');
-      setAppliedDate(new Date().toISOString().split('T')[0]);
+      setAppliedDate(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]);
       setNotes('');
     }
   });
