@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
 
 @import "tailwindcss";
 
@@ -46,3 +46,135 @@
     background: #334155; /* slate-750 */
   }
 }
+
+/* Rich Text Editor Styling */
+.rich-editor {
+  outline: none;
+}
+
+.rich-editor h1 {
+  font-size: 1.875rem; /* text-3xl */
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: #f8fafc;
+}
+
+.rich-editor h2 {
+  font-size: 1.5rem; /* text-2xl */
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: #f1f5f9;
+}
+
+.rich-editor h3 {
+  font-size: 1.25rem; /* text-xl */
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.375rem;
+  color: #e2e8f0;
+}
+
+.rich-editor p {
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+
+.rich-editor ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.rich-editor ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.rich-editor li {
+  margin-bottom: 0.25rem;
+  line-height: 1.6;
+}
+
+.rich-editor blockquote {
+  border-left: 4px solid var(--color-accent);
+  padding-left: 1rem;
+  margin-left: 0;
+  margin-right: 0;
+  margin-bottom: 1rem;
+  margin-top: 0.5rem;
+  font-style: italic;
+  color: #94a3b8;
+  background-color: rgba(34, 211, 238, 0.03);
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-radius: 0 0.375rem 0.375rem 0;
+}
+
+.rich-editor a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.rich-editor a:hover {
+  color: var(--color-accent-hover);
+}
+
+.rich-editor code {
+  font-family: var(--font-mono);
+  background-color: #1e293b; /* slate-800 */
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+  color: #f43f5e; /* rose-500 */
+  border: 1px solid #334155;
+}
+
+.rich-editor pre {
+  background-color: #0b0f19;
+  border: 1px solid #1e293b;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+}
+
+.rich-editor pre code {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  color: #34d399; /* emerald-400 */
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+/* Font Family Styles */
+.rich-editor font[face="Inter"], .rich-editor [style*="font-family: Inter"] {
+  font-family: 'Inter', sans-serif !important;
+}
+
+.rich-editor font[face="IBM Plex Mono"], .rich-editor [style*="font-family: IBM Plex Mono"] {
+  font-family: 'IBM Plex Mono', monospace !important;
+}
+
+.rich-editor font[face="Playfair Display"], .rich-editor [style*="font-family: Playfair Display"] {
+  font-family: 'Playfair Display', serif !important;
+}
+
+.rich-editor font[face="Outfit"], .rich-editor [style*="font-family: Outfit"] {
+  font-family: 'Outfit', sans-serif !important;
+}
+
+/* Font Size styles */
+.rich-editor font[size="1"] { font-size: 12px; }
+.rich-editor font[size="2"] { font-size: 14px; }
+.rich-editor font[size="3"] { font-size: 16px; }
+.rich-editor font[size="4"] { font-size: 20px; }
+.rich-editor font[size="5"] { font-size: 26px; }
+.rich-editor font[size="6"] { font-size: 32px; }
+.rich-editor font[size="7"] { font-size: 40px; }

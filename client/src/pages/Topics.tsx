@@ -11,10 +11,45 @@ import {
   PenSquare,
   Maximize2,
   Minimize2,
-  X
+  X,
+  Bold,
+  Italic,
+  Underline,
+  List,
+  ListOrdered,
+  Quote,
+  Link,
+  Code,
+  FileText,
+  Loader2,
+  Image as ImageIcon
 } from 'lucide-react';
 import { API_URL } from '../config';
 import type { Topic, MasteryLevel, TopicNote } from '../types';
+
+const FONTS = [
+  { name: 'Inter (Sans)', value: 'Inter' },
+  { name: 'IBM Plex Mono', value: 'IBM Plex Mono' },
+  { name: 'Playfair Display', value: 'Playfair Display' },
+  { name: 'Outfit (Sleek)', value: 'Outfit' }
+];
+
+const FONT_SIZES = [
+  { name: 'Extra Small', value: '1' },
+  { name: 'Small', value: '2' },
+  { name: 'Medium (Body)', value: '3' },
+  { name: 'Large', value: '4' },
+  { name: 'Extra Large', value: '5' },
+  { name: 'Heading 2', value: '6' },
+  { name: 'Heading 1', value: '7' }
+];
+
+const HEADINGS = [
+  { name: 'Paragraph', value: 'p' },
+  { name: 'Heading 1', value: 'h1' },
+  { name: 'Heading 2', value: 'h2' },
+  { name: 'Heading 3', value: 'h3' }
+];
 
 interface TopicCategory {
   id: number;
@@ -43,10 +78,20 @@ export const Topics: React.FC = () => {
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [isNoteModalMaximized, setIsNoteModalMaximized] = useState(true);
   const [editorLineHeight, setEditorLineHeight] = useState('1.7');
-  const [activeFormat, setActiveFormat] = useState<{ bold: boolean; italic: boolean; underline: boolean }>({
+  const [activeFormat, setActiveFormat] = useState<{
+    bold: boolean;
+    italic: boolean;
+    underline: boolean;
+    fontName: string;
+    fontSize: string;
+    heading: string;
+  }>({
     bold: false,
     italic: false,
-    underline: false
+    underline: false,
+    fontName: 'Inter',
+    fontSize: '3',
+    heading: 'p'
   });
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -62,7 +107,10 @@ export const Topics: React.FC = () => {
     content: string;
     isNew: boolean;
   } | null>(null);
+  const [activeTopicId, setActiveTopicId] = useState<number | null>(null);
+  const [noteSearchQuery, setNoteSearchQuery] = useState('');
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const { data: categories = [], isLoading: isCategoriesLoading } = useQuery<TopicCategory[]>({
     queryKey: ['topicCategories'],
@@ -246,53 +294,121 @@ export const Topics: React.FC = () => {
     const isBold = document.queryCommandState('bold');
     const isItalic = document.queryCommandState('italic');
     const isUnderline = document.queryCommandState('underline');
+    
+    let fontName = 'Inter';
+    try {
+      const f = document.queryCommandValue('fontName');
+      if (f) fontName = f.replace(/['"]/g, '');
+    } catch {}
+    
+    let fontSize = '3';
+    try {
+      const s = document.queryCommandValue('fontSize');
+      if (s) fontSize = s;
+    } catch {}
+
+    let heading = 'p';
+    try {
+      const block = document.queryCommandValue('formatBlock');
+      if (block) heading = block;
+    } catch {}
+
     setActiveFormat({
       bold: isBold,
       italic: isItalic,
-      underline: isUnderline
+      underline: isUnderline,
+      fontName,
+      fontSize,
+      heading
     });
+
     setActiveNote(prev => prev ? { ...prev, content: editorRef.current?.innerHTML || '' } : prev);
   };
 
   const applyEditorCommand = (command: string, value?: string) => {
     if (!editorRef.current) return;
     editorRef.current.focus();
-    document.execCommand('styleWithCSS', false, '');
+    document.execCommand('styleWithCSS', false, 'false');
     document.execCommand(command, false, value ?? '');
     syncEditorContent();
   };
 
-  const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+  const uploadImageToImgBB = async (file: File): Promise<string> => {
+    const apiKey = import.meta.env.VITE_IMGBB_API_KEY || '9dc3dad08426edd7693cc862c6c8f9b1';
+    if (!apiKey || apiKey === '') {
+      // Fallback to base64 if key is empty
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          resolve(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Image upload failed');
+    }
+
+    const result = await response.json();
+    return result.data.url;
+  };
+
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && editorRef.current) {
+      editorRef.current.focus();
+      setSaveStatus('saving');
+      try {
+        const imageUrl = await uploadImageToImgBB(file);
+        const imgHtml = `<img src="${imageUrl}" style="max-width: 100%; height: auto; border-radius: 0.375rem; display: block; margin: 0.5rem 0;" />`;
+        document.execCommand('insertHTML', false, imgHtml);
+        syncEditorContent();
+        setSaveStatus('saved');
+        window.setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 1500);
+      } catch (err) {
+        console.error('File insert failed:', err);
+        setSaveStatus('error');
+        window.setTimeout(() => setSaveStatus(prev => prev === 'error' ? 'idle' : prev), 2200);
+      }
+    }
+  };
+
+  const handlePaste = async (event: React.ClipboardEvent<HTMLDivElement>) => {
     if (!editorRef.current) return;
-    event.preventDefault();
 
     const items = event.clipboardData.items;
     let containsImage = false;
+    let imageFile: File | null = null;
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') === 0) {
         containsImage = true;
+        imageFile = items[i].getAsFile();
         break;
       }
     }
 
-    if (containsImage) {
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.type.indexOf('image') === 0) {
-          const file = item.getAsFile();
-          if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              const base64 = e.target?.result as string;
-              if (base64) {
-                const imgHtml = `<img src="${base64}" style="max-width: 100%; height: auto; border-radius: 0.375rem; display: block; margin: 0.5rem 0;" />`;
-                document.execCommand('insertHTML', false, imgHtml);
-                syncEditorContent();
-              }
-            };
-            reader.readAsDataURL(file);
-          }
-        }
+    if (containsImage && imageFile) {
+      event.preventDefault();
+      setSaveStatus('saving');
+      try {
+        const imageUrl = await uploadImageToImgBB(imageFile);
+        const imgHtml = `<img src="${imageUrl}" style="max-width: 100%; height: auto; border-radius: 0.375rem; display: block; margin: 0.5rem 0;" />`;
+        document.execCommand('insertHTML', false, imgHtml);
+        syncEditorContent();
+        setSaveStatus('saved');
+        window.setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 1500);
+      } catch (err) {
+        console.error('Paste upload failed:', err);
+        setSaveStatus('error');
+        window.setTimeout(() => setSaveStatus(prev => prev === 'error' ? 'idle' : prev), 2200);
       }
       return;
     }
@@ -324,10 +440,10 @@ export const Topics: React.FC = () => {
         return imgElement;
       }
 
-      const allowedTags = ['b', 'strong', 'i', 'em', 'u', 'br', 'p', 'div', 'span', 'ul', 'ol', 'li'];
+      const allowedTags = ['b', 'strong', 'i', 'em', 'u', 'br', 'p', 'div', 'span', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'blockquote', 'pre', 'code', 'a'];
       const sanitizedElement = document.createElement(allowedTags.includes(tag) ? tag : 'span');
 
-      // Preserve bold/italic/underline but force text color to white and strip backgrounds
+      // Preserve formatting
       const computedStyle = element.getAttribute('style');
       if (computedStyle) {
         const style = element.style;
@@ -335,11 +451,12 @@ export const Topics: React.FC = () => {
         if (style.fontWeight && style.fontWeight !== 'normal') keepStyles.fontWeight = style.fontWeight;
         if (style.fontStyle && style.fontStyle !== 'normal') keepStyles.fontStyle = style.fontStyle;
         if (style.textDecoration && style.textDecoration !== 'none') keepStyles.textDecoration = style.textDecoration;
+        if (style.fontFamily) keepStyles.fontFamily = style.fontFamily;
         Object.entries(keepStyles).forEach(([key, value]) => {
           sanitizedElement.style.setProperty(key, value);
         });
       }
-      sanitizedElement.style.setProperty('color', 'white');
+      sanitizedElement.style.setProperty('color', '#f1f5f9');
       sanitizedElement.style.removeProperty('background');
       sanitizedElement.style.removeProperty('background-color');
 
@@ -395,17 +512,67 @@ export const Topics: React.FC = () => {
     syncEditorContent();
   };
 
+  const handleCreateLink = () => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    const url = prompt('Enter URL (e.g. https://google.com):');
+    if (url) {
+      let formattedUrl = url.trim();
+      if (!/^https?:\/\//i.test(formattedUrl)) {
+        formattedUrl = 'https://' + formattedUrl;
+      }
+      applyEditorCommand('createLink', formattedUrl);
+    }
+  };
+
+  const handleCodeFormatting = () => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      document.execCommand('insertHTML', false, '<code class="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 font-mono text-xs text-rose-400">code</code>');
+      syncEditorContent();
+      return;
+    }
+    const selectedText = selection.toString();
+    if (selectedText.includes('\n')) {
+      const codeBlockHtml = `<pre class="bg-slate-950/80 p-3 rounded-lg border border-slate-800 font-mono text-xs my-2 overflow-x-auto text-emerald-400 block"><code style="font-family: inherit;">${selectedText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre><p><br></p>`;
+      document.execCommand('insertHTML', false, codeBlockHtml);
+    } else {
+      const inlineCodeHtml = `<code class="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 font-mono text-xs text-rose-400">${selectedText}</code>`;
+      document.execCommand('insertHTML', false, inlineCodeHtml);
+    }
+    syncEditorContent();
+  };
+
   const openNoteEditor = (topic: Topic, note?: TopicNote) => {
-    const initialTitle = note?.title ?? `Note ${Math.max((topic.topicNotes?.length ?? 0) + 1, 1)}`;
-    const initialContent = note?.content ?? '';
-    setActiveNote({
-      topicId: topic.id,
-      noteId: note?.id ?? null,
-      title: initialTitle,
-      content: initialContent,
-      isNew: !note
-    });
-    setNoteOriginal({ title: initialTitle, content: initialContent });
+    setActiveTopicId(topic.id);
+    if (note) {
+      setActiveNote({
+        topicId: topic.id,
+        noteId: note.id,
+        title: note.title,
+        content: note.content ?? '',
+        isNew: false
+      });
+      setNoteOriginal({ title: note.title, content: note.content ?? '' });
+    } else {
+      if (topic.topicNotes && topic.topicNotes.length > 0) {
+        const first = topic.topicNotes[0];
+        setActiveNote({
+          topicId: topic.id,
+          noteId: first.id,
+          title: first.title,
+          content: first.content ?? '',
+          isNew: false
+        });
+        setNoteOriginal({ title: first.title, content: first.content ?? '' });
+      } else {
+        setActiveNote(null);
+        setNoteOriginal(null);
+      }
+    }
+    setNoteSearchQuery('');
     setSaveStatus('idle');
     setDeleteConfirmOpen(false);
     setExitConfirmOpen(false);
@@ -420,15 +587,16 @@ export const Topics: React.FC = () => {
       title: `Note ${nextIndex}`,
       content: ''
     });
-    const nextNote = {
+    setActiveTopicId(topic.id);
+    setActiveNote({
       topicId: topic.id,
       noteId: created.id,
       title: created.title || `Note ${nextIndex}`,
-      content: created.content || '',
+      content: '',
       isNew: false
-    };
-    setActiveNote(nextNote);
-    setNoteOriginal({ title: nextNote.title, content: nextNote.content });
+    });
+    setNoteOriginal({ title: created.title || `Note ${nextIndex}`, content: '' });
+    setNoteSearchQuery('');
     setSaveStatus('idle');
     setDeleteConfirmOpen(false);
     setExitConfirmOpen(false);
@@ -465,7 +633,7 @@ export const Topics: React.FC = () => {
 
   const handleSaveActiveNote = async () => {
     if (!activeNote) return;
-    const trimmedTitle = activeNote.title.trim() || `Note ${activeNote.noteId ? activeNote.noteId : 1}`;
+    const trimmedTitle = activeNote.title.trim() || 'Untitled Note';
     if (activeNote.noteId) {
       await updateTopicNoteMutation.mutateAsync({
         topicId: activeNote.topicId,
@@ -513,6 +681,7 @@ export const Topics: React.FC = () => {
     setActiveNote(null);
     setNoteOriginal(null);
     setIsNoteModalMaximized(false);
+    setActiveTopicId(null);
   };
 
   const hasUnsavedChanges = React.useMemo(() => {
@@ -528,12 +697,113 @@ export const Topics: React.FC = () => {
     try {
       await handleSaveActiveNote();
       setSaveStatus('saved');
-      window.setTimeout(() => setSaveStatus('idle'), 1800);
+      window.setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 1500);
     } catch {
       setSaveStatus('error');
-      window.setTimeout(() => setSaveStatus('idle'), 2200);
+      window.setTimeout(() => setSaveStatus(prev => prev === 'error' ? 'idle' : prev), 2000);
     }
   };
+
+  const autosaveTimerRef = useRef<number | null>(null);
+
+  const savePendingChangesImmediate = async () => {
+    if (autosaveTimerRef.current) {
+      window.clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+
+    if (activeNote && noteOriginal) {
+      const changed = activeNote.title !== noteOriginal.title || activeNote.content !== noteOriginal.content;
+      if (changed) {
+        setSaveStatus('saving');
+        try {
+          await handleSaveActiveNote();
+          setSaveStatus('saved');
+          window.setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 1000);
+        } catch (err) {
+          console.error('Immediate save error:', err);
+          setSaveStatus('error');
+          window.setTimeout(() => setSaveStatus(prev => prev === 'error' ? 'idle' : prev), 2000);
+        }
+      }
+    }
+  };
+
+  const handleSelectNote = async (note: TopicNote) => {
+    await savePendingChangesImmediate();
+    setActiveNote({
+      topicId: note.topicId,
+      noteId: note.id,
+      title: note.title,
+      content: note.content ?? '',
+      isNew: false
+    });
+    setNoteOriginal({ title: note.title, content: note.content ?? '' });
+    setSaveStatus('idle');
+  };
+
+  const handleCreateNewNoteInModal = async () => {
+    if (!activeTopicId) return;
+    await savePendingChangesImmediate();
+    const nextIndex = (activeTopic?.topicNotes?.length ?? 0) + 1;
+    const created = await createTopicNoteMutation.mutateAsync({
+      topicId: activeTopicId,
+      title: `Note ${nextIndex}`,
+      content: ''
+    });
+    setActiveNote({
+      topicId: activeTopicId,
+      noteId: created.id,
+      title: created.title || `Note ${nextIndex}`,
+      content: '',
+      isNew: false
+    });
+    setNoteOriginal({ title: created.title || `Note ${nextIndex}`, content: '' });
+    setSaveStatus('idle');
+  };
+
+  const handleCloseModalWithSave = async () => {
+    await savePendingChangesImmediate();
+    closeNoteModal();
+  };
+
+  // Autosave effect
+  useEffect(() => {
+    if (!noteModalOpen || !activeNote || !noteOriginal) return;
+
+    const changed = activeNote.title !== noteOriginal.title || activeNote.content !== noteOriginal.content;
+    if (!changed) {
+      return;
+    }
+
+    if (autosaveTimerRef.current) {
+      window.clearTimeout(autosaveTimerRef.current);
+    }
+
+    setSaveStatus('saving');
+
+    autosaveTimerRef.current = window.setTimeout(async () => {
+      try {
+        await handleSaveActiveNote();
+        setSaveStatus('saved');
+        window.setTimeout(() => {
+          setSaveStatus(prev => prev === 'saved' ? 'idle' : prev);
+        }, 1500);
+      } catch (err) {
+        console.error('Autosave error:', err);
+        setSaveStatus('error');
+        window.setTimeout(() => {
+          setSaveStatus(prev => prev === 'error' ? 'idle' : prev);
+        }, 2000);
+      }
+    }, 1200);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        window.clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [activeNote?.title, activeNote?.content, noteOriginal, noteModalOpen]);
 
   const handleSetPracticedToday = (id: number) => {
     updateTopicMutation.mutate({
@@ -560,6 +830,27 @@ export const Topics: React.FC = () => {
     });
     return groups;
   }, [categories, topics]);
+
+  const activeTopic = topics.find(t => t.id === activeTopicId);
+
+  const filteredNotes = React.useMemo(() => {
+    if (!activeTopic) return [];
+    const query = noteSearchQuery.toLowerCase().trim();
+    if (!query) return activeTopic.topicNotes || [];
+    return (activeTopic.topicNotes || []).filter(note => 
+      note.title.toLowerCase().includes(query) || 
+      (note.content || '').toLowerCase().includes(query)
+    );
+  }, [activeTopic, noteSearchQuery]);
+
+  const stripHtmlAndTruncate = (html: string | null | undefined, maxLength = 80) => {
+    if (!html) return 'Empty note...';
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    const text = temp.textContent || temp.innerText || '';
+    if (text.length <= maxLength) return text || 'Empty note...';
+    return text.substring(0, maxLength) + '...';
+  };
 
   const renderMasteryIndicator = (level: MasteryLevel) => {
     const metric = MASTERY_METRICS[level];
@@ -849,181 +1140,366 @@ export const Topics: React.FC = () => {
         </div>
       )}
 
-      {noteModalOpen && activeNote && (
+      {noteModalOpen && activeTopicId !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm">
-          <div className={`relative w-full ${isNoteModalMaximized ? 'max-w-[98vw] h-[97vh]' : 'max-w-[92vw] h-[86vh]'} rounded-3xl border border-slate-800 bg-slate-950/95 shadow-2xl shadow-black/50 flex flex-col overflow-hidden`}>
-            <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-4 py-3">
+          <div className={`relative w-full ${isNoteModalMaximized ? 'max-w-[98vw] h-[97vh]' : 'max-w-[92vw] h-[86vh]'} rounded-3xl border border-slate-850 bg-slate-950 shadow-2xl shadow-black/50 flex flex-col overflow-hidden`}>
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-900 bg-slate-900/60 px-4 py-3 shrink-0">
               <div className="flex items-center gap-2">
-                <PenSquare className="h-4 w-4 text-cyan-400" />
-                <input
-                  type="text"
-                  value={activeNote.title}
-                  onChange={(e) => setActiveNote(prev => prev ? { ...prev, title: e.target.value } : prev)}
-                  className="bg-transparent text-sm font-mono uppercase tracking-[0.25em] text-slate-100 outline-none"
-                  placeholder="Note title"
-                />
+                <BookOpen className="h-4 w-4 text-cyan-400" />
+                <span className="font-mono text-xs font-bold uppercase tracking-[0.25em] text-slate-100">
+                  Concept Workspace // {activeTopic?.name}
+                </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => {
-                    void handleSaveNoteClick();
-                  }}
-                  className="rounded border border-emerald-700/60 bg-emerald-950/60 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.2em] text-emerald-300 transition-colors hover:bg-emerald-900"
-                >
-                  Save
-                </button>
-                <button
                   onClick={() => setIsNoteModalMaximized(prev => !prev)}
-                  className="rounded border border-slate-700 bg-slate-800/80 p-2 text-slate-300 transition-colors hover:border-cyan-500 hover:text-cyan-300"
+                  className="rounded border border-slate-800 bg-slate-900/80 p-2 text-slate-300 transition-colors hover:border-cyan-500 hover:text-cyan-300 cursor-pointer"
                   title={isNoteModalMaximized ? 'Restore view' : 'Maximize'}
                 >
                   {isNoteModalMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </button>
                 <button
-                  onClick={() => {
-                    if (hasUnsavedChanges) {
-                      setExitConfirmOpen(true);
-                      return;
-                    }
-                    closeNoteModal();
-                  }}
-                  className="rounded border border-slate-700 bg-slate-800/80 p-2 text-slate-300 transition-colors hover:border-rose-500 hover:text-rose-300"
-                  title="Close"
+                  onClick={handleCloseModalWithSave}
+                  className="rounded border border-slate-800 bg-slate-900/80 p-2 text-slate-300 transition-colors hover:border-rose-500 hover:text-rose-300 cursor-pointer"
+                  title="Close and save workspace"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.08),transparent_30%),linear-gradient(180deg,rgba(15,23,42,0.95),rgba(2,6,23,0.98))] p-4">
-              <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70 shadow-inner">
-                <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 bg-slate-950/70 px-3 py-2">
-                  <button
-                    type="button"
-                    onClick={() => applyEditorCommand('bold')}
-                    className={`rounded border px-2.5 py-1 text-[11px] font-semibold transition-colors ${activeFormat.bold ? 'border-cyan-500 bg-cyan-500/15 text-cyan-300 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]' : 'border-slate-700 bg-slate-900/80 text-slate-200 hover:border-cyan-500 hover:text-cyan-300'}`}
-                  >
-                    B
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyEditorCommand('italic')}
-                    className={`rounded border px-2.5 py-1 text-[11px] italic transition-colors ${activeFormat.italic ? 'border-cyan-500 bg-cyan-500/15 text-cyan-300 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]' : 'border-slate-700 bg-slate-900/80 text-slate-200 hover:border-cyan-500 hover:text-cyan-300'}`}
-                  >
-                    I
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyEditorCommand('underline')}
-                    className={`rounded border px-2.5 py-1 text-[11px] underline transition-colors ${activeFormat.underline ? 'border-cyan-500 bg-cyan-500/15 text-cyan-300 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]' : 'border-slate-700 bg-slate-900/80 text-slate-200 hover:border-cyan-500 hover:text-cyan-300'}`}
-                  >
-                    U
-                  </button>
-                  <div className="mx-1 h-4 w-px bg-slate-800" />
-                  <label className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.25em] text-slate-400">
-                    <span>Line spacing</span>
-                    <select
-                      value={editorLineHeight}
-                      onChange={(e) => applyLineSpacing(e.target.value)}
-                      className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] text-slate-200 outline-none"
-                    >
-                      <option value="1">1.0</option>
-                      <option value="1.3">1.3</option>
-                      <option value="1.6">1.6</option>
-                      <option value="2">2.0</option>
-                    </select>
+            {/* Split Dual-Pane View */}
+            <div className="flex-1 flex overflow-hidden">
+              
+              {/* Left Sidebar: Notes list */}
+              <div className="w-80 border-r border-slate-900 bg-slate-950/20 flex flex-col h-full shrink-0">
+                {/* Search Bar */}
+                <div className="p-3 border-b border-slate-900">
+                  <label className="flex items-center gap-2 rounded border border-slate-850 bg-slate-900/40 px-2.5 py-1.5 text-xs text-slate-400">
+                    <Search className="w-3.5 h-3.5 text-slate-500" />
+                    <input
+                      type="search"
+                      value={noteSearchQuery}
+                      onChange={(e) => setNoteSearchQuery(e.target.value)}
+                      placeholder="Search notes..."
+                      className="w-full bg-transparent outline-none placeholder-slate-700 text-slate-200 text-xs"
+                    />
                   </label>
                 </div>
-                <div
-                  ref={editorRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onPaste={handlePaste}
-                  onInput={syncEditorContent}
-                  onBlur={syncEditorContent}
-                  style={{ lineHeight: editorLineHeight }}
-                  className="flex-1 overflow-y-auto px-5 py-5 text-[15px] leading-[1.7] text-slate-100 outline-none [white-space:pre-wrap]"
-                />
+
+                {/* Notes List */}
+                <div className="flex-1 overflow-y-auto p-2 space-y-1 select-none scrollbar-thin">
+                  {filteredNotes.length === 0 ? (
+                    <div className="text-center font-mono text-[10px] text-slate-600 py-12">
+                      {noteSearchQuery ? 'NO_MATCHING_NOTES' : 'NO_NOTES_FOUND'}
+                    </div>
+                  ) : (
+                    filteredNotes.map((note, index) => {
+                      const isSelected = activeNote?.noteId === note.id;
+                      return (
+                        <div
+                          key={note.id}
+                          onClick={() => handleSelectNote(note)}
+                          className={`p-3 rounded-lg border text-left cursor-pointer transition-all duration-150 relative group ${
+                            isSelected
+                              ? 'bg-cyan-950/20 border-cyan-950/50 text-cyan-200 shadow-[0_0_10px_rgba(34,211,238,0.02)]'
+                              : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-900/25 hover:text-slate-200'
+                          }`}
+                        >
+                          <div className="font-semibold text-xs truncate pr-6">
+                            {note.title || 'Untitled Note'}
+                          </div>
+                          <div className="text-[10px] text-slate-500 mt-1 line-clamp-1 pr-6 font-sans">
+                            {stripHtmlAndTruncate(note.content, 60)}
+                          </div>
+                          <div className="text-[9px] text-slate-650 font-mono mt-1.5 flex items-center justify-between">
+                            <span>
+                              {new Date(note.updatedAt).toLocaleDateString()}
+                            </span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity text-cyan-600 font-sans">
+                              Edit Note
+                            </span>
+                          </div>
+                          
+                          {/* Trash button on list item */}
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm(`Are you sure you want to delete note "${note.title || 'Untitled Note'}"?`)) {
+                                if (isSelected) {
+                                  await deleteTopicNoteMutation.mutateAsync({ topicId: note.topicId, noteId: note.id });
+                                  const remaining = (activeTopic?.topicNotes || []).filter(n => n.id !== note.id);
+                                  if (remaining.length > 0) {
+                                    void handleSelectNote(remaining[0]);
+                                  } else {
+                                    setActiveNote(null);
+                                    setNoteOriginal(null);
+                                  }
+                                } else {
+                                  await deleteTopicNoteMutation.mutateAsync({ topicId: note.topicId, noteId: note.id });
+                                }
+                              }
+                            }}
+                            className="absolute top-3 right-3 p-1 rounded hover:bg-slate-800 text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                            title="Delete note"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Sidebar Footer: Add New Note */}
+                <div className="p-3 border-t border-slate-900 bg-slate-900/10">
+                  <button
+                    onClick={handleCreateNewNoteInModal}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded border border-slate-800 hover:border-cyan-800 bg-slate-900/50 hover:bg-slate-900 text-slate-400 hover:text-cyan-400 text-xs font-mono uppercase tracking-wider transition-all cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    New note
+                  </button>
+                </div>
               </div>
+
+              {/* Right Pane: Editor or Empty State */}
+              <div className="flex-1 flex flex-col h-full bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.03),transparent_35%),linear-gradient(180deg,rgba(15,23,42,0.95),rgba(2,6,23,0.98))] overflow-hidden">
+                {activeNote ? (
+                  <div className="flex-1 flex flex-col overflow-hidden h-full">
+                    
+                    {/* Active Note Title & Info Area */}
+                    <div className="px-5 pt-4 pb-2 border-b border-slate-900 bg-slate-950/20 flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4 shrink-0">
+                      <input
+                        type="text"
+                        value={activeNote.title}
+                        onChange={(e) => setActiveNote(prev => prev ? { ...prev, title: e.target.value } : prev)}
+                        className="bg-transparent text-lg font-bold text-slate-100 outline-none border-b border-transparent focus:border-slate-850 pb-1 flex-1 placeholder-slate-700"
+                        placeholder="Untitled Note"
+                      />
+                      
+                      <div className="flex items-center gap-3">
+                        <div className={`rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.2em] transition-colors flex items-center gap-1.5 ${
+                          saveStatus === 'saving'
+                            ? 'border-amber-700/60 bg-amber-950/60 text-amber-300'
+                            : saveStatus === 'saved'
+                              ? 'border-emerald-700/60 bg-emerald-950/60 text-emerald-300'
+                              : saveStatus === 'error'
+                                ? 'border-rose-800/60 bg-rose-950/60 text-rose-300'
+                                : 'border-slate-900 bg-slate-950/60 text-slate-500'
+                        }`}>
+                          {saveStatus === 'saving' && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
+                          {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? 'Save failed' : 'Saved'}
+                        </div>
+                        
+                        <button
+                          onClick={async () => {
+                            if (confirm('Are you sure you want to delete this note?')) {
+                              await handleDeleteActiveNote();
+                              const remaining = (activeTopic?.topicNotes || []).filter(n => n.id !== activeNote.noteId);
+                              if (remaining.length > 0) {
+                                void handleSelectNote(remaining[0]);
+                              } else {
+                                setActiveNote(null);
+                                setNoteOriginal(null);
+                              }
+                            }
+                          }}
+                          className="rounded border border-rose-950/40 bg-rose-950/20 px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.15em] text-rose-400 transition-colors hover:bg-rose-900/40 hover:border-rose-800 cursor-pointer"
+                          title="Delete note"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Editor Toolbar */}
+                    <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-900 bg-slate-950/40 px-4 py-2 shrink-0">
+                      
+                      {/* Font Family Selector */}
+                      <select
+                        value={activeFormat.fontName}
+                        onChange={(e) => applyEditorCommand('fontName', e.target.value)}
+                        className="rounded border border-slate-800 bg-slate-900 px-2.5 py-1 text-[11px] text-slate-300 outline-none cursor-pointer"
+                        title="Font Family"
+                      >
+                        {FONTS.map(f => (
+                          <option key={f.value} value={f.value}>{f.name}</option>
+                        ))}
+                      </select>
+
+                      {/* Font Size Selector */}
+                      <select
+                        value={activeFormat.fontSize}
+                        onChange={(e) => applyEditorCommand('fontSize', e.target.value)}
+                        className="rounded border border-slate-800 bg-slate-900 px-2.5 py-1 text-[11px] text-slate-300 outline-none cursor-pointer"
+                        title="Font Size"
+                      >
+                        {FONT_SIZES.map(s => (
+                          <option key={s.value} value={s.value}>{s.name}</option>
+                        ))}
+                      </select>
+
+                      {/* Heading Selector */}
+                      <select
+                        value={activeFormat.heading}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === 'p') {
+                            applyEditorCommand('formatBlock', '<p>');
+                          } else {
+                            applyEditorCommand('formatBlock', `<${val}>`);
+                          }
+                        }}
+                        className="rounded border border-slate-800 bg-slate-900 px-2.5 py-1 text-[11px] text-slate-300 outline-none cursor-pointer"
+                        title="Text Format"
+                      >
+                        {HEADINGS.map(h => (
+                          <option key={h.value} value={h.value}>{h.name}</option>
+                        ))}
+                      </select>
+
+                      <div className="mx-1 h-5 w-px bg-slate-850" />
+
+                      {/* Formatting buttons */}
+                      <button
+                        type="button"
+                        onClick={() => applyEditorCommand('bold')}
+                        className={`p-1.5 rounded transition-colors cursor-pointer ${activeFormat.bold ? 'border border-cyan-500 bg-cyan-500/15 text-cyan-300 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]' : 'border border-slate-800 bg-slate-900/80 text-slate-400 hover:border-cyan-500 hover:text-cyan-300'}`}
+                        title="Bold (Ctrl+B)"
+                      >
+                        <Bold className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyEditorCommand('italic')}
+                        className={`p-1.5 rounded transition-colors cursor-pointer ${activeFormat.italic ? 'border border-cyan-500 bg-cyan-500/15 text-cyan-300 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]' : 'border border-slate-800 bg-slate-900/80 text-slate-400 hover:border-cyan-500 hover:text-cyan-300'}`}
+                        title="Italic (Ctrl+I)"
+                      >
+                        <Italic className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyEditorCommand('underline')}
+                        className={`p-1.5 rounded transition-colors cursor-pointer ${activeFormat.underline ? 'border border-cyan-500 bg-cyan-500/15 text-cyan-300 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]' : 'border border-slate-800 bg-slate-900/80 text-slate-400 hover:border-cyan-500 hover:text-cyan-300'}`}
+                        title="Underline (Ctrl+U)"
+                      >
+                        <Underline className="w-3.5 h-3.5" />
+                      </button>
+
+                      <div className="mx-1 h-5 w-px bg-slate-850" />
+
+                      {/* Lists */}
+                      <button
+                        type="button"
+                        onClick={() => applyEditorCommand('insertUnorderedList')}
+                        className={`p-1.5 rounded transition-colors cursor-pointer ${activeFormat.heading === 'ul' ? 'border border-cyan-500 bg-cyan-500/15 text-cyan-300 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]' : 'border border-slate-800 bg-slate-900/80 text-slate-400 hover:border-cyan-500 hover:text-cyan-300'}`}
+                        title="Bullet List"
+                      >
+                        <List className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyEditorCommand('insertOrderedList')}
+                        className={`p-1.5 rounded transition-colors cursor-pointer ${activeFormat.heading === 'ol' ? 'border border-cyan-500 bg-cyan-500/15 text-cyan-300 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]' : 'border border-slate-800 bg-slate-900/80 text-slate-400 hover:border-cyan-500 hover:text-cyan-300'}`}
+                        title="Numbered List"
+                      >
+                        <ListOrdered className="w-3.5 h-3.5" />
+                      </button>
+
+                      <div className="mx-1 h-5 w-px bg-slate-850" />
+
+                      {/* Blockquote */}
+                      <button
+                        type="button"
+                        onClick={() => applyEditorCommand('formatBlock', '<blockquote>')}
+                        className={`p-1.5 rounded transition-colors cursor-pointer ${activeFormat.heading === 'blockquote' ? 'border border-cyan-500 bg-cyan-500/15 text-cyan-300 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]' : 'border border-slate-800 bg-slate-900/80 text-slate-400 hover:border-cyan-500 hover:text-cyan-300'}`}
+                        title="Quote Block"
+                      >
+                        <Quote className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Link */}
+                      <button
+                        type="button"
+                        onClick={handleCreateLink}
+                        className="p-1.5 rounded border border-slate-800 bg-slate-900/80 text-slate-400 hover:border-cyan-500 hover:text-cyan-300 transition-colors cursor-pointer"
+                        title="Insert Hyperlink"
+                      >
+                        <Link className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Code block */}
+                      <button
+                        type="button"
+                        onClick={handleCodeFormatting}
+                        className="p-1.5 rounded border border-slate-800 bg-slate-900/80 text-slate-400 hover:border-cyan-500 hover:text-cyan-300 transition-colors cursor-pointer"
+                        title="Code Snippet"
+                      >
+                        <Code className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Image upload button */}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-1.5 rounded border border-slate-800 bg-slate-900/80 text-slate-400 hover:border-cyan-500 hover:text-cyan-300 transition-colors cursor-pointer"
+                        title="Insert Image"
+                      >
+                        <ImageIcon className="w-3.5 h-3.5" />
+                      </button>
+
+                    </div>
+
+                    {/* Hidden file input */}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImageFileChange}
+                      accept="image/*"
+                      className="hidden"
+                    />
+
+                    {/* Scrollable Editor Area */}
+                    <div className="flex-1 overflow-y-auto px-6 py-6 bg-slate-950/20">
+                      <div
+                        ref={editorRef}
+                        contentEditable
+                        suppressContentEditableWarning
+                        onPaste={handlePaste}
+                        onInput={syncEditorContent}
+                        onBlur={syncEditorContent}
+                        onKeyUp={syncEditorContent}
+                        onMouseUp={syncEditorContent}
+                        className="rich-editor w-full min-h-full text-[15px] leading-[1.65] text-slate-100 outline-none pb-24"
+                      />
+                    </div>
+
+                  </div>
+                ) : (
+                  /* Empty state on Right Pane */
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-900/10">
+                    <div className="w-16 h-16 rounded-2xl bg-cyan-500/5 border border-cyan-500/10 flex items-center justify-center mb-4">
+                      <FileText className="w-8 h-8 text-cyan-500/30" />
+                    </div>
+                    <h3 className="text-slate-200 font-mono text-xs uppercase tracking-[0.2em] font-semibold mb-2">No note selected</h3>
+                    <p className="text-slate-500 text-xs max-w-sm mb-6 leading-relaxed">
+                      Choose an existing note from the sidebar, or create a new note to start documenting your concept notes, code snippets, and master strategies.
+                    </p>
+                    <button
+                      onClick={handleCreateNewNoteInModal}
+                      className="px-4 py-2 text-xs font-mono uppercase tracking-wider rounded border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500 hover:text-slate-950 transition-all shadow-[0_0_15px_rgba(34,211,238,0.1)] cursor-pointer"
+                    >
+                      + Create first note
+                    </button>
+                  </div>
+                )}
+              </div>
+
             </div>
 
-            <div className="flex items-center justify-between border-t border-slate-800 bg-slate-900/80 px-4 py-3">
-              <div className="flex items-center gap-2">
-                <div className={`rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.28em] transition-colors ${
-                  saveStatus === 'saving'
-                    ? 'border-amber-700/60 bg-amber-950/60 text-amber-300'
-                    : saveStatus === 'saved'
-                      ? 'border-emerald-700/60 bg-emerald-950/60 text-emerald-300'
-                      : saveStatus === 'error'
-                        ? 'border-rose-800/60 bg-rose-950/60 text-rose-300'
-                        : 'border-slate-800 bg-slate-950/60 text-slate-500'
-                }`}>
-                  {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? 'Save failed' : 'Draft ready'}
-                </div>
-                <div className="text-[10px] font-mono uppercase tracking-[0.3em] text-slate-500">
-                  {activeNote?.isNew ? 'Unsaved draft' : 'Editing saved note'}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setDeleteConfirmOpen(true)}
-                  className="rounded border border-rose-800/60 bg-rose-950/60 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.2em] text-rose-300 transition-colors hover:bg-rose-900"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-
-            {deleteConfirmOpen && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-                <div className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900/95 p-4 shadow-2xl shadow-black/50">
-                  <div className="text-sm font-semibold text-slate-100">Delete this note?</div>
-                  <div className="mt-1 text-xs leading-5 text-slate-400">
-                    This will remove the note permanently from this topic.
-                  </div>
-                  <div className="mt-4 flex justify-end gap-2">
-                    <button
-                      onClick={() => setDeleteConfirmOpen(false)}
-                      className="rounded border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300 transition-colors hover:border-slate-500"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => {
-                        void handleDeleteActiveNote();
-                      }}
-                      className="rounded border border-rose-800/60 bg-rose-950/60 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.2em] text-rose-300 transition-colors hover:bg-rose-900"
-                    >
-                      Confirm Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-            {exitConfirmOpen && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-                <div className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900/95 p-4 shadow-2xl shadow-black/50">
-                  <div className="text-sm font-semibold text-slate-100">Discard changes?</div>
-                  <div className="mt-1 text-xs leading-5 text-slate-400">
-                    You have unsaved changes. Leaving now will discard them.
-                  </div>
-                  <div className="mt-4 flex justify-end gap-2">
-                    <button
-                      onClick={() => setExitConfirmOpen(false)}
-                      className="rounded border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300 transition-colors hover:border-slate-500"
-                    >
-                      Stay
-                    </button>
-                    <button
-                      onClick={() => closeNoteModal()}
-                      className="rounded border border-rose-800/60 bg-rose-950/60 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.2em] text-rose-300 transition-colors hover:bg-rose-900"
-                    >
-                      Discard
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}

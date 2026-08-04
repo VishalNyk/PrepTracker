@@ -34,6 +34,8 @@ export const Applications: React.FC = () => {
   // Filters
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterTier, setFilterTier] = useState<string>('ALL');
+  const [activeNotesPopoverId, setActiveNotesPopoverId] = useState<number | null>(null);
+  const [tempNotesText, setTempNotesText] = useState('');
 
   // Form States
   const [companyName, setCompanyName] = useState('');
@@ -280,18 +282,21 @@ export const Applications: React.FC = () => {
                     </td>
 
                     {/* Notes inline editable text */}
-                    <td className="p-4">
-                      <input 
-                        type="text"
-                        defaultValue={app.notes || ''}
-                        onBlur={(e) => {
-                          if (e.target.value !== (app.notes || '')) {
-                            handleNotesChange(app.id, e.target.value.trim());
-                          }
+                    <td className="p-4 max-w-[220px]">
+                      <div
+                        onClick={() => {
+                          setActiveNotesPopoverId(app.id);
+                          setTempNotesText(app.notes || '');
                         }}
-                        placeholder="Click to add process notes..."
-                        className="bg-transparent hover:bg-slate-900/35 border border-transparent hover:border-slate-800 rounded px-2 py-1 text-slate-400 placeholder-slate-700 focus:bg-slate-900 focus:border-accent w-full text-xs font-sans transition-all focus:text-slate-200"
-                      />
+                        className="truncate text-slate-400 hover:text-slate-200 cursor-pointer hover:bg-slate-900/40 px-2 py-1.5 rounded transition-all text-xs"
+                        title="Click to view/edit full notes"
+                      >
+                        {app.notes ? (
+                          app.notes
+                        ) : (
+                          <span className="text-slate-650 italic font-mono text-[10px]">click_to_add...</span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Actions */}
@@ -427,6 +432,54 @@ export const Applications: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {activeNotesPopoverId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-905 p-5 space-y-4 animate-fade-in shadow-2xl">
+            {/* Popover Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Process Notes // {applications?.find(a => a.id === activeNotesPopoverId)?.companyName}
+              </span>
+              <button
+                onClick={() => setActiveNotesPopoverId(null)}
+                className="text-slate-500 hover:text-slate-350 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Popover Body */}
+            <textarea
+              value={tempNotesText}
+              onChange={(e) => setTempNotesText(e.target.value)}
+              placeholder="Add referral details, interviewer info, OA questions, or feedback here..."
+              rows={6}
+              autoFocus
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-slate-200 placeholder-slate-700 outline-none focus:border-accent resize-none font-sans leading-relaxed"
+            />
+
+            {/* Popover Footer */}
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                onClick={() => setActiveNotesPopoverId(null)}
+                className="px-3 py-1.5 rounded border border-slate-800 hover:bg-slate-800 text-[10px] font-mono uppercase tracking-wider text-slate-400 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  handleNotesChange(activeNotesPopoverId, tempNotesText.trim());
+                  setActiveNotesPopoverId(null);
+                }}
+                className="px-3 py-1.5 rounded bg-accent hover:bg-accent-hover text-slate-950 font-bold text-[10px] font-mono uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Save Notes
+              </button>
+            </div>
           </div>
         </div>
       )}
