@@ -381,8 +381,146 @@ export const Topics: React.FC = () => {
     }
   };
 
+  const toggleBlockQuote = () => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    
+    let heading = 'p';
+    try {
+      const block = document.queryCommandValue('formatBlock');
+      if (block) heading = block.toLowerCase();
+    } catch {}
+
+    if (heading === 'blockquote') {
+      document.execCommand('formatBlock', false, '<p>');
+    } else {
+      document.execCommand('formatBlock', false, '<blockquote>');
+    }
+    syncEditorContent();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!editorRef.current) return;
+
+    if (e.key === 'Enter') {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+
+      let node = range.commonAncestorContainer;
+      if (node.nodeType === Node.TEXT_NODE) {
+        node = node.parentNode || node;
+      }
+
+      const element = node as HTMLElement;
+      const blockquote = element.closest('blockquote');
+      const pre = element.closest('pre');
+
+      if (blockquote) {
+        const currentLineText = range.startContainer.textContent || '';
+        
+        if (currentLineText.trim() === '') {
+          e.preventDefault();
+          
+          const p = document.createElement('p');
+          p.innerHTML = '<br>';
+          
+          if (blockquote.parentNode) {
+            blockquote.parentNode.insertBefore(p, blockquote.nextSibling);
+            
+            let currentBlockNode = range.startContainer;
+            if (currentBlockNode.nodeType === Node.TEXT_NODE) {
+              currentBlockNode = currentBlockNode.parentNode || currentBlockNode;
+            }
+            if (currentBlockNode && currentBlockNode !== blockquote) {
+              currentBlockNode.remove();
+            } else {
+              blockquote.innerHTML = '';
+            }
+
+            if (blockquote.textContent === '' || blockquote.innerHTML === '' || blockquote.innerHTML === '<br>') {
+              blockquote.remove();
+            }
+
+            const newRange = document.createRange();
+            newRange.setStart(p, 0);
+            newRange.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+            syncEditorContent();
+          }
+          return;
+        }
+      } else if (pre) {
+        e.preventDefault();
+        document.execCommand('insertHTML', false, '\n');
+        syncEditorContent();
+        return;
+      }
+    }
+
+    if (e.key === 'Backspace') {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+
+      let node = range.commonAncestorContainer;
+      if (node.nodeType === Node.TEXT_NODE) {
+        node = node.parentNode || node;
+      }
+
+      const element = node as HTMLElement;
+      const blockquote = element.closest('blockquote');
+      
+      if (blockquote && (blockquote.textContent === '' || blockquote.innerHTML === '<br>' || blockquote.innerHTML === '')) {
+        e.preventDefault();
+        const p = document.createElement('p');
+        p.innerHTML = '<br>';
+        blockquote.parentNode?.replaceChild(p, blockquote);
+
+        const newRange = document.createRange();
+        newRange.setStart(p, 0);
+        newRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+        syncEditorContent();
+        return;
+      }
+    }
+  };
+
+  const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget && editorRef.current) {
+      const lastChild = editorRef.current.lastChild as HTMLElement | null;
+      if (!lastChild || (lastChild.nodeType === Node.ELEMENT_NODE && ['blockquote', 'pre', 'ul', 'ol', 'h1', 'h2', 'h3'].includes(lastChild.tagName.toLowerCase()))) {
+        const p = document.createElement('p');
+        p.innerHTML = '<br>';
+        editorRef.current.appendChild(p);
+        
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.setStart(p, 0);
+        range.collapse(true);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        syncEditorContent();
+      } else {
+        editorRef.current.focus();
+        const selection = window.getSelection();
+        if (selection) {
+          const range = document.createRange();
+          range.selectNodeContents(editorRef.current);
+          range.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      }
+    }
+  };
+
   const handlePaste = async (event: React.ClipboardEvent<HTMLDivElement>) => {
     if (!editorRef.current) return;
+    event.preventDefault();
 
     const items = event.clipboardData.items;
     let containsImage = false;
@@ -452,13 +590,14 @@ export const Topics: React.FC = () => {
         if (style.fontStyle && style.fontStyle !== 'normal') keepStyles.fontStyle = style.fontStyle;
         if (style.textDecoration && style.textDecoration !== 'none') keepStyles.textDecoration = style.textDecoration;
         if (style.fontFamily) keepStyles.fontFamily = style.fontFamily;
+        if (style.fontSize) keepStyles.fontSize = style.fontSize;
         Object.entries(keepStyles).forEach(([key, value]) => {
           sanitizedElement.style.setProperty(key, value);
         });
       }
       sanitizedElement.style.setProperty('color', '#f1f5f9');
-      sanitizedElement.style.removeProperty('background');
-      sanitizedElement.style.removeProperty('background-color');
+      sanitizedElement.style.setProperty('background-color', 'transparent', 'important');
+      sanitizedElement.style.setProperty('background', 'transparent', 'important');
 
       for (const child of Array.from(element.childNodes)) {
         const sanitizedChild = sanitizeNode(child);
@@ -474,6 +613,11 @@ export const Topics: React.FC = () => {
       const parser = new DOMParser();
       const doc = parser.parseFromString(clipboardHtml, 'text/html');
       const body = doc.body;
+      
+      // Remove tags that carry harmful external global styles
+      const styles = body.querySelectorAll('style, script, link, meta');
+      styles.forEach(s => s.remove());
+
       const fragment = document.createDocumentFragment();
       body.childNodes.forEach(node => {
         const sanitized = sanitizeNode(node);
@@ -1414,7 +1558,7 @@ export const Topics: React.FC = () => {
                       {/* Blockquote */}
                       <button
                         type="button"
-                        onClick={() => applyEditorCommand('formatBlock', '<blockquote>')}
+                        onClick={toggleBlockQuote}
                         className={`p-1.5 rounded transition-colors cursor-pointer ${activeFormat.heading === 'blockquote' ? 'border border-cyan-500 bg-cyan-500/15 text-cyan-300 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]' : 'border border-slate-800 bg-slate-900/80 text-slate-400 hover:border-cyan-500 hover:text-cyan-300'}`}
                         title="Quote Block"
                       >
@@ -1463,7 +1607,10 @@ export const Topics: React.FC = () => {
                     />
 
                     {/* Scrollable Editor Area */}
-                    <div className="flex-1 overflow-y-auto px-6 py-6 bg-slate-950/20">
+                    <div 
+                      onClick={handleEditorClick}
+                      className="flex-1 overflow-y-auto px-6 py-6 bg-slate-950/20"
+                    >
                       <div
                         ref={editorRef}
                         contentEditable
@@ -1471,6 +1618,7 @@ export const Topics: React.FC = () => {
                         onPaste={handlePaste}
                         onInput={syncEditorContent}
                         onBlur={syncEditorContent}
+                        onKeyDown={handleKeyDown}
                         onKeyUp={syncEditorContent}
                         onMouseUp={syncEditorContent}
                         className="rich-editor w-full min-h-full text-[15px] leading-[1.65] text-slate-100 outline-none pb-24"
