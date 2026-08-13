@@ -12,6 +12,7 @@
     "concurrently": "^8.2.2"
   },
   "dependencies": {
-    "firebase": "^12.17.0"
+    "firebase": "^12.17.0",
+    "jsonwebtoken": "^9.0.3"
   }
 }

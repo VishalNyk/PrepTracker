@@ -1,20 +1,22 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Category, MilestoneStatus, ApplicationStatus } from '@prisma/client';
+import { requireAuth } from '../middleware/authMiddleware';
 
 const router = Router();
 const prisma = new PrismaClient();
+
+// Apply auth middleware
+router.use(requireAuth);
 
 // Helper to calculate streaks
 function calculateStreaks(dates: string[]): { currentStreakDays: number; longestStreakDays: number } {
   if (dates.length === 0) return { currentStreakDays: 0, longestStreakDays: 0 };
   
-  // Today's date string in YYYY-MM-DD
   const todayStr = new Date().toISOString().split('T')[0];
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = yesterday.toISOString().split('T')[0];
   
-  // Check if today or yesterday was practiced
   const hasToday = dates.includes(todayStr);
   const hasYesterday = dates.includes(yesterdayStr);
   
@@ -36,7 +38,6 @@ function calculateStreaks(dates: string[]): { currentStreakDays: number; longest
     }
   }
 
-  // Longest streak
   const sortedDates = [...new Set(dates)].sort().map(d => new Date(d));
   let longestStreakDays = 1;
   let runningStreak = 1;
@@ -64,8 +65,12 @@ function calculateStreaks(dates: string[]): { currentStreakDays: number; longest
 // GET /api/analytics/summary
 router.get('/summary', async (req: Request, res: Response) => {
   try {
+    const userId = (req as any).userId;
+    const baseWhere: any = userId ? { userId } : {};
+
     // 1. Streaks
     const allLogs = await prisma.activityLog.findMany({
+      where: baseWhere,
       select: { date: true }
     });
     
@@ -77,13 +82,14 @@ router.get('/summary', async (req: Request, res: Response) => {
 
     // 2. All-time hours
     const totalMinutesAllTime = await prisma.activityLog.aggregate({
+      where: baseWhere,
       _sum: { durationMin: true }
     });
     const totalHoursAllTime = Math.round(((totalMinutesAllTime._sum.durationMin || 0) / 60) * 10) / 10;
 
     // 3. This week's hours
     const today = new Date();
-    const dayOfWeek = today.getDay(); // 0 Sunday, 1 Monday...
+    const dayOfWeek = today.getDay();
     const distanceToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - distanceToMonday);
@@ -95,6 +101,7 @@ router.get('/summary', async (req: Request, res: Response) => {
 
     const thisWeeksLogs = await prisma.activityLog.findMany({
       where: {
+        ...baseWhere,
         date: {
           gte: startOfWeek,
           lte: endOfWeek
@@ -124,6 +131,7 @@ router.get('/summary', async (req: Request, res: Response) => {
     // 5. Milestones due this week
     const milestonesDueThisWeek = await prisma.milestone.count({
       where: {
+        ...baseWhere,
         targetDate: {
           gte: startOfWeek,
           lte: endOfWeek
@@ -137,6 +145,7 @@ router.get('/summary', async (req: Request, res: Response) => {
     // 6. Applications in pipeline
     const applicationsInPipeline = await prisma.application.count({
       where: {
+        ...baseWhere,
         status: {
           in: [
             ApplicationStatus.APPLIED,
@@ -166,8 +175,9 @@ router.get('/summary', async (req: Request, res: Response) => {
 router.get('/weekly', async (req: Request, res: Response) => {
   try {
     const weeks = parseInt(req.query.weeks as string, 10) || 12;
+    const userId = (req as any).userId;
+    const baseWhere: any = userId ? { userId } : {};
     
-    // Find start of current week
     const today = new Date();
     const dayOfWeek = today.getDay();
     const distanceToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
@@ -175,12 +185,12 @@ router.get('/weekly', async (req: Request, res: Response) => {
     currentWeekStart.setDate(today.getDate() - distanceToMonday);
     currentWeekStart.setHours(0, 0, 0, 0);
 
-    // Compute overall start date
     const overallStartDate = new Date(currentWeekStart);
     overallStartDate.setDate(currentWeekStart.getDate() - ((weeks - 1) * 7));
 
     const logs = await prisma.activityLog.findMany({
       where: {
+        ...baseWhere,
         date: {
           gte: overallStartDate
         }
@@ -216,7 +226,6 @@ router.get('/weekly', async (req: Request, res: Response) => {
         byCategory[log.category] += log.durationMin;
       });
 
-      // Convert category minutes to hours (rounded to 1 decimal)
       const byCategoryHours: { [key: string]: number } = {};
       Object.entries(byCategory).forEach(([cat, mins]) => {
         byCategoryHours[cat] = Math.round((mins / 60) * 10) / 10;
@@ -238,7 +247,12 @@ router.get('/weekly', async (req: Request, res: Response) => {
 // GET /api/analytics/mastery-breakdown
 router.get('/mastery-breakdown', async (req: Request, res: Response) => {
   try {
-    const topics = await prisma.topic.findMany();
+    const userId = (req as any).userId;
+    const baseWhere: any = userId ? { userId } : {};
+
+    const topics = await prisma.topic.findMany({
+      where: baseWhere
+    });
     const categories = Object.values(Category);
     
     const breakdown = categories.map(cat => {

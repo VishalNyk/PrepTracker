@@ -1,8 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Category, MilestoneStatus } from '@prisma/client';
+import { requireAuth } from '../middleware/authMiddleware';
 
 const router = Router();
 const prisma = new PrismaClient();
+
+// Apply auth middleware
+router.use(requireAuth);
 
 const VALID_CATEGORIES: Category[] = [
   'DSA',
@@ -27,7 +31,6 @@ async function updateMilestoneProgress(milestoneId: number) {
 
   const totalTasks = milestone.tasks.length;
   if (totalTasks === 0) {
-    // If no tasks, keep progress at 0 or current status unless manually set
     return;
   }
 
@@ -52,7 +55,14 @@ async function updateMilestoneProgress(milestoneId: number) {
 // GET /api/milestones - List milestones with tasks
 router.get('/', async (req: Request, res: Response) => {
   try {
+    const userId = (req as any).userId;
+    const where: any = {};
+    if (userId) {
+      where.userId = userId;
+    }
+
     const milestones = await prisma.milestone.findMany({
+      where,
       include: {
         tasks: {
           orderBy: { order: 'asc' }
@@ -70,6 +80,8 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
   try {
     const { title, category, targetDate } = req.body;
+    const userId = (req as any).userId;
+
     if (!title || !category || !targetDate) {
       return res.status(400).json({ error: 'Missing required fields: title, category, targetDate' });
     }
@@ -84,7 +96,8 @@ router.post('/', async (req: Request, res: Response) => {
         category: category as Category,
         targetDate: new Date(targetDate),
         status: MilestoneStatus.NOT_STARTED,
-        progressPct: 0
+        progressPct: 0,
+        userId: userId || null
       },
       include: { tasks: true }
     });
@@ -99,7 +112,15 @@ router.post('/', async (req: Request, res: Response) => {
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
+    const userId = (req as any).userId;
     const { title, category, targetDate, status, progressPct } = req.body;
+
+    if (userId) {
+      const existing = await prisma.milestone.findFirst({ where: { id, userId } });
+      if (!existing) {
+        return res.status(403).json({ error: 'Forbidden: You do not own this milestone' });
+      }
+    }
 
     const updateData: any = {};
     if (title) updateData.title = title;
@@ -139,6 +160,15 @@ router.put('/:id', async (req: Request, res: Response) => {
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
+    const userId = (req as any).userId;
+
+    if (userId) {
+      const existing = await prisma.milestone.findFirst({ where: { id, userId } });
+      if (!existing) {
+        return res.status(403).json({ error: 'Forbidden: You do not own this milestone' });
+      }
+    }
+
     await prisma.milestone.delete({ where: { id } });
     res.json({ success: true });
   } catch (error: any) {
@@ -150,10 +180,18 @@ router.delete('/:id', async (req: Request, res: Response) => {
 router.post('/:id/tasks', async (req: Request, res: Response) => {
   try {
     const milestoneId = parseInt(req.params.id, 10);
+    const userId = (req as any).userId;
     const { title } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Missing required field: title' });
+    }
+
+    if (userId) {
+      const existing = await prisma.milestone.findFirst({ where: { id: milestoneId, userId } });
+      if (!existing) {
+        return res.status(403).json({ error: 'Forbidden: You do not own this milestone' });
+      }
     }
 
     // Get current max order
@@ -186,7 +224,15 @@ router.put('/:id/tasks/:taskId', async (req: Request, res: Response) => {
   try {
     const milestoneId = parseInt(req.params.id, 10);
     const taskId = parseInt(req.params.taskId, 10);
+    const userId = (req as any).userId;
     const { isDone, order, title } = req.body;
+
+    if (userId) {
+      const existing = await prisma.milestone.findFirst({ where: { id: milestoneId, userId } });
+      if (!existing) {
+        return res.status(403).json({ error: 'Forbidden: You do not own this milestone' });
+      }
+    }
 
     const updateData: any = {};
     if (isDone !== undefined) updateData.isDone = isDone;
@@ -212,6 +258,14 @@ router.delete('/:id/tasks/:taskId', async (req: Request, res: Response) => {
   try {
     const milestoneId = parseInt(req.params.id, 10);
     const taskId = parseInt(req.params.taskId, 10);
+    const userId = (req as any).userId;
+
+    if (userId) {
+      const existing = await prisma.milestone.findFirst({ where: { id: milestoneId, userId } });
+      if (!existing) {
+        return res.status(403).json({ error: 'Forbidden: You do not own this milestone' });
+      }
+    }
 
     await prisma.milestoneTask.delete({
       where: { id: taskId, milestoneId }

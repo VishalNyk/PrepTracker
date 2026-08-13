@@ -7,10 +7,14 @@ import {
   BookOpen, 
   Briefcase, 
   BarChart3, 
-  Terminal
+  Terminal,
+  User as UserIcon
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export const Sidebar: React.FC = () => {
+  const { user, isLocalDev } = useAuth();
+
   const menuItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Activity Log', path: '/log', icon: FileText },
@@ -18,6 +22,7 @@ export const Sidebar: React.FC = () => {
     { name: 'Topics', path: '/topics', icon: BookOpen },
     { name: 'Applications', path: '/applications', icon: Briefcase },
     { name: 'Analytics', path: '/analytics', icon: BarChart3 },
+    { name: 'Profile', path: '/profile', icon: UserIcon },
   ];
 
   return (
@@ -32,7 +37,7 @@ export const Sidebar: React.FC = () => {
             PREP_TRACKER
           </h1>
           <p className="text-[10px] font-mono text-cyan-500 uppercase tracking-widest leading-none">
-            v1.0.0 // LOCAL
+            v1.0.0 // {isLocalDev ? 'LOCAL' : 'REMOTE'}
           </p>
         </div>
       </div>
@@ -68,9 +73,9 @@ export const Sidebar: React.FC = () => {
 
       {/* Footer Info */}
       <div className="p-6 border-t border-slate-800 font-mono text-[10px] text-slate-500 space-y-1">
-        <div>STATUS: ACTIVE</div>
-        <div>DATABASE: LOCALHOST:3306</div>
-        <div>MODE: DEVELOPMENT</div>
+        <div className="truncate">USER: {user?.email ? user.email.toUpperCase() : 'GUEST'}</div>
+        <div>DATABASE: {isLocalDev ? 'LOCAL_PG' : 'SUPABASE'}</div>
+        <div>MODE: {isLocalDev ? 'DEVELOPMENT' : 'PRODUCTION'}</div>
       </div>
     </div>
   );

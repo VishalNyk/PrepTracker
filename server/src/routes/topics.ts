@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, MasteryLevel } from '@prisma/client';
+import { requireAuth } from '../middleware/authMiddleware';
 
 interface TopicNotePayload {
   id?: number;
@@ -10,12 +11,19 @@ interface TopicNotePayload {
 const router = Router();
 const prisma = new PrismaClient();
 
+// Apply auth middleware to all routes in this router
+router.use(requireAuth);
+
 // GET /api/topics - Fetch topics with optional category filter
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { category } = req.query;
+    const userId = (req as any).userId;
     const where: any = {};
 
+    if (userId) {
+      where.userId = userId;
+    }
     if (category) {
       where.category = category as string;
     }
@@ -40,6 +48,8 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
   try {
     const { category, name } = req.body;
+    const userId = (req as any).userId;
+
     if (!category || !name) {
       return res.status(400).json({ error: 'Missing required fields: category, name' });
     }
@@ -48,7 +58,8 @@ router.post('/', async (req: Request, res: Response) => {
       data: {
         category: category as string,
         name,
-        masteryLevel: MasteryLevel.NOT_STARTED
+        masteryLevel: MasteryLevel.NOT_STARTED,
+        userId: userId || null
       }
     });
 
@@ -58,11 +69,19 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// PUT /api/topics/:id - Update topic name, mastery level, notes, or lastPracticed date
+// PUT /api/topics/:id - Update topic details
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
+    const userId = (req as any).userId;
     const { name, masteryLevel, notes, lastPracticed } = req.body;
+
+    if (userId) {
+      const existing = await prisma.topic.findFirst({ where: { id, userId } });
+      if (!existing) {
+        return res.status(403).json({ error: 'Forbidden: You do not own this topic' });
+      }
+    }
 
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
@@ -92,12 +111,17 @@ router.put('/:id', async (req: Request, res: Response) => {
 router.post('/:id/notes', async (req: Request, res: Response) => {
   try {
     const topicId = parseInt(req.params.id, 10);
+    const userId = (req as any).userId;
     const payload = req.body as TopicNotePayload;
     const title = (payload.title || '').trim() || `Note ${Date.now()}`;
 
     const topic = await prisma.topic.findUnique({ where: { id: topicId } });
     if (!topic) {
       return res.status(404).json({ error: 'Topic not found' });
+    }
+
+    if (userId && topic.userId !== userId) {
+      return res.status(403).json({ error: 'Forbidden: You do not own this topic' });
     }
 
     const note = await prisma.topicNote.create({
@@ -119,9 +143,17 @@ router.put('/:id/notes/:noteId', async (req: Request, res: Response) => {
   try {
     const topicId = parseInt(req.params.id, 10);
     const noteId = parseInt(req.params.noteId, 10);
+    const userId = (req as any).userId;
     const payload = req.body as TopicNotePayload;
 
-    const existing = await prisma.topicNote.findFirst({ where: { id: noteId, topicId } });
+    const existing = await prisma.topicNote.findFirst({
+      where: {
+        id: noteId,
+        topicId,
+        ...(userId ? { topic: { userId } } : {})
+      }
+    });
+
     if (!existing) {
       return res.status(404).json({ error: 'Note not found' });
     }
@@ -145,8 +177,16 @@ router.delete('/:id/notes/:noteId', async (req: Request, res: Response) => {
   try {
     const topicId = parseInt(req.params.id, 10);
     const noteId = parseInt(req.params.noteId, 10);
+    const userId = (req as any).userId;
 
-    const existing = await prisma.topicNote.findFirst({ where: { id: noteId, topicId } });
+    const existing = await prisma.topicNote.findFirst({
+      where: {
+        id: noteId,
+        topicId,
+        ...(userId ? { topic: { userId } } : {})
+      }
+    });
+
     if (!existing) {
       return res.status(404).json({ error: 'Note not found' });
     }
@@ -162,6 +202,15 @@ router.delete('/:id/notes/:noteId', async (req: Request, res: Response) => {
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
+    const userId = (req as any).userId;
+
+    if (userId) {
+      const existing = await prisma.topic.findFirst({ where: { id, userId } });
+      if (!existing) {
+        return res.status(403).json({ error: 'Forbidden: You do not own this topic' });
+      }
+    }
+
     await prisma.topic.delete({ where: { id } });
     res.json({ success: true });
   } catch (error: any) {

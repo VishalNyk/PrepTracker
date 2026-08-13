@@ -433,7 +433,9 @@ export const Topics: React.FC = () => {
               currentBlockNode = currentBlockNode.parentNode || currentBlockNode;
             }
             if (currentBlockNode && currentBlockNode !== blockquote) {
-              currentBlockNode.remove();
+              if (currentBlockNode.parentNode) {
+                currentBlockNode.parentNode.removeChild(currentBlockNode);
+              }
             } else {
               blockquote.innerHTML = '';
             }

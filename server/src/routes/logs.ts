@@ -1,8 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Category } from '@prisma/client';
+import { requireAuth } from '../middleware/authMiddleware';
 
 const router = Router();
 const prisma = new PrismaClient();
+
+// Apply auth middleware
+router.use(requireAuth);
 
 const VALID_CATEGORIES: Category[] = [
   'DSA',
@@ -20,7 +24,12 @@ const isValidCategory = (value: unknown): value is Category => typeof value === 
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { from, to, category } = req.query;
+    const userId = (req as any).userId;
     const where: any = {};
+
+    if (userId) {
+      where.userId = userId;
+    }
 
     if (category) {
       const categoryValue = Array.isArray(category) ? category[0] : category;
@@ -43,7 +52,7 @@ router.get('/', async (req: Request, res: Response) => {
     const logs = await prisma.activityLog.findMany({
       where,
       orderBy: { date: 'desc' },
-      take: 100 // Limit for safety, but table requests 30
+      take: 100 // Limit for safety
     });
 
     res.json(logs);
@@ -56,25 +65,30 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/heatmap', async (req: Request, res: Response) => {
   try {
     const yearStr = req.query.year as string;
+    const userId = (req as any).userId;
     const year = yearStr ? parseInt(yearStr, 10) : new Date().getFullYear();
 
     const startDate = new Date(Date.UTC(year, 0, 1, 0, 0, 0));
     const endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
 
+    const where: any = {
+      date: {
+        gte: startDate,
+        lte: endDate,
+      }
+    };
+    if (userId) {
+      where.userId = userId;
+    }
+
     const logs = await prisma.activityLog.findMany({
-      where: {
-        date: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
+      where
     });
 
     // Aggregate in memory
     const dailyData: { [key: string]: { totalMinutes: number; categories: { [cat: string]: number } } } = {};
 
     logs.forEach(log => {
-      // Use UTC ISO string to represent date as YYYY-MM-DD consistently
       const dateKey = new Date(log.date).toISOString().split('T')[0];
       if (!dailyData[dateKey]) {
         dailyData[dateKey] = { totalMinutes: 0, categories: {} };
@@ -84,7 +98,6 @@ router.get('/heatmap', async (req: Request, res: Response) => {
     });
 
     const result = Object.entries(dailyData).map(([date, data]) => {
-      // Find top category
       let topCategory = 'None';
       let maxMin = 0;
       Object.entries(data.categories).forEach(([cat, min]) => {
@@ -111,6 +124,7 @@ router.get('/heatmap', async (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
   try {
     const { date, category, topic, durationMin, notes } = req.body;
+    const userId = (req as any).userId;
     
     if (!date || !category || durationMin === undefined) {
       return res.status(400).json({ error: 'Missing required fields: date, category, durationMin' });
@@ -126,7 +140,8 @@ router.post('/', async (req: Request, res: Response) => {
         category: category as Category,
         topic: topic || null,
         durationMin: parseInt(durationMin, 10),
-        notes: notes || null
+        notes: notes || null,
+        userId: userId || null
       }
     });
 
@@ -140,7 +155,15 @@ router.post('/', async (req: Request, res: Response) => {
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
+    const userId = (req as any).userId;
     const { date, category, topic, durationMin, notes } = req.body;
+
+    if (userId) {
+      const existing = await prisma.activityLog.findFirst({ where: { id, userId } });
+      if (!existing) {
+        return res.status(403).json({ error: 'Forbidden: You do not own this activity log' });
+      }
+    }
 
     if (category !== undefined && !isValidCategory(category)) {
       return res.status(400).json({ error: `Invalid category. Supported categories: ${Array.from(VALID_CATEGORIES).join(', ')}` });
@@ -167,6 +190,15 @@ router.put('/:id', async (req: Request, res: Response) => {
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
+    const userId = (req as any).userId;
+
+    if (userId) {
+      const existing = await prisma.activityLog.findFirst({ where: { id, userId } });
+      if (!existing) {
+        return res.status(403).json({ error: 'Forbidden: You do not own this activity log' });
+      }
+    }
+
     await prisma.activityLog.delete({ where: { id } });
     res.json({ success: true });
   } catch (error: any) {

@@ -1,15 +1,23 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient, Category, ApplicationStatus } from '@prisma/client';
+import { PrismaClient, ApplicationStatus } from '@prisma/client';
+import { requireAuth } from '../middleware/authMiddleware';
 
 const router = Router();
 const prisma = new PrismaClient();
+
+// Apply auth middleware to all routes in this router
+router.use(requireAuth);
 
 // GET /api/applications - Fetch applications with optional status and tier filters
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { status, tier } = req.query;
+    const userId = (req as any).userId;
     const where: any = {};
 
+    if (userId) {
+      where.userId = userId;
+    }
     if (status) {
       where.status = status as ApplicationStatus;
     }
@@ -32,6 +40,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
   try {
     const { companyName, role, tier, status, appliedDate, notes } = req.body;
+    const userId = (req as any).userId;
     
     if (!companyName || !role || !appliedDate) {
       return res.status(400).json({ error: 'Missing required fields: companyName, role, appliedDate' });
@@ -45,7 +54,8 @@ router.post('/', async (req: Request, res: Response) => {
         status: (status as ApplicationStatus) || ApplicationStatus.APPLIED,
         appliedDate: new Date(appliedDate),
         lastUpdate: new Date(),
-        notes: notes || null
+        notes: notes || null,
+        userId: userId || null
       }
     });
 
@@ -55,11 +65,19 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// PUT /api/applications/:id - Update application status/notes (auto-update lastUpdate)
+// PUT /api/applications/:id - Update application details
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
+    const userId = (req as any).userId;
     const { companyName, role, tier, status, appliedDate, notes } = req.body;
+
+    if (userId) {
+      const existing = await prisma.application.findFirst({ where: { id, userId } });
+      if (!existing) {
+        return res.status(403).json({ error: 'Forbidden: You do not own this application' });
+      }
+    }
 
     const updateData: any = {
       lastUpdate: new Date() // auto-update timestamp
@@ -87,6 +105,15 @@ router.put('/:id', async (req: Request, res: Response) => {
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
+    const userId = (req as any).userId;
+
+    if (userId) {
+      const existing = await prisma.application.findFirst({ where: { id, userId } });
+      if (!existing) {
+        return res.status(403).json({ error: 'Forbidden: You do not own this application' });
+      }
+    }
+
     await prisma.application.delete({ where: { id } });
     res.json({ success: true });
   } catch (error: any) {
