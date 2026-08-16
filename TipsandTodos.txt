@@ -4,7 +4,8 @@ Set VITE_SUPABASE_URL="placeholder"
 Set VITE_SUPABASE_ANON_KEY="placeholder"
 
 server/.env:
-Set SUPABASE_JWT_SECRET="placeholder"
+Set SUPABASE_URL="placeholder"
+Set SUPABASE_ANON_KEY="placeholder"
 Set DATABASE_URL="postgresql://postgres:midawper56@localhost:5432/prep_tracker?schema=public" (Your local Postgres URL)
 
 and vice versa (comment uncomment)

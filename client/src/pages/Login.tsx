@@ -2,16 +2,42 @@ import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
-import { Mail, Lock, User, Loader2, ArrowRight } from 'lucide-react';
+import { 
+  Mail, 
+  Lock, 
+  User, 
+  Loader2, 
+  ArrowRight, 
+  Terminal, 
+  Brain, 
+  Trophy, 
+  Briefcase, 
+  Activity, 
+  Sparkles,
+  Code2
+} from 'lucide-react';
+
+const MOCK_CODE = `// prep-tracker/dsa/graphs.ts
+function breadthFirstSearch(graph: Graph, startNode: string) {
+  const queue: string[] = [startNode];
+  const visited = new Set<string>([startNode]);
+  
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    console.log(\`Practicing topic: \${node} [MASTERY: LEARNING]\`);
+    
+    for (const neighbor of graph[node]) {
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+  }
+}`;
 
 export const Login: React.FC = () => {
   const { user, isLocalDev } = useAuth();
   const navigate = useNavigate();
-
-  // If user is already authenticated (or in local dev mock mode), skip login screen
-  if (user && !isLocalDev) {
-    return <Navigate to="/" replace />;
-  }
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,6 +47,11 @@ export const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // If user is already authenticated (or in local dev mock mode), skip login screen
+  if (user && !isLocalDev) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +63,6 @@ export const Login: React.FC = () => {
 
     try {
       if (isSignUp) {
-        // Sign up
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -45,7 +75,6 @@ export const Login: React.FC = () => {
         if (error) throw error;
         setSuccessMsg('Account registered successfully! Check your email for validation details or log in.');
       } else {
-        // Log in
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password
@@ -99,202 +128,325 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.06),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(99,102,241,0.04),transparent_40%),linear-gradient(180deg,#020617,#0f172a)] p-4 font-sans text-slate-100">
+    <div className="min-h-screen w-full flex bg-[#020617] text-slate-100 font-sans relative overflow-hidden select-none">
       
-      {/* Background blur effects */}
-      <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-cyan-500/5 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/3 w-96 h-96 bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none" />
+      {/* Code grid patterns background */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-30 pointer-events-none" />
+      
+      {/* Floating neon lighting blobs */}
+      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-cyan-500/5 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-indigo-500/5 blur-[120px] pointer-events-none" />
 
-      {/* Main Container */}
-      <div className="w-full max-w-[420px] bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-8 shadow-2xl relative z-10 animate-fade-in space-y-6">
+      {/* Main split-view container */}
+      <div className="flex-1 flex max-w-7xl mx-auto w-full relative z-10">
         
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-slate-100 via-cyan-300 to-indigo-300 bg-clip-text text-transparent">
-            {forgotMode ? 'Recover Password' : isSignUp ? 'Create Account' : 'Welcome to PrepTracker'}
-          </h1>
-          <p className="text-xs text-slate-500 font-mono uppercase tracking-[0.15em]">
-            {forgotMode ? 'RESET_PORTAL' : isSignUp ? 'USER_REGISTRATION' : 'SECURE_LOGIN'}
-          </p>
+        {/* LEFT COLUMN: DSA, Interview & Coding features showcase (Hidden on mobile) */}
+        <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-16 relative border-r border-slate-900/60 bg-slate-950/20">
+          
+          {/* Logo brand */}
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.1)]">
+              <Terminal className="w-5 h-5 text-cyan-400" />
+            </div>
+            <div>
+              <h1 className="font-mono text-sm font-bold tracking-wider text-slate-100 uppercase">
+                PREP_TRACKER
+              </h1>
+              <p className="text-[9px] font-mono text-cyan-500 uppercase tracking-widest leading-none">
+                DSA_ENGINE // RUNNING
+              </p>
+            </div>
+          </div>
+
+          {/* Central Showcase: Mock Terminal with DFS/BFS code */}
+          <div className="space-y-8 my-auto max-w-[500px]">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-800 bg-slate-900/40 text-xs font-mono text-cyan-400">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Optimize Your Tech Interview Prep</span>
+              </div>
+              <h2 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-slate-100 via-slate-200 to-slate-450 bg-clip-text text-transparent leading-snug">
+                Your sandbox for mastering data structures & cracking coding interviews.
+              </h2>
+            </div>
+
+            {/* Mock IDE Card */}
+            <div className="w-full bg-slate-950/60 backdrop-blur border border-slate-900 rounded-xl overflow-hidden shadow-2xl relative">
+              {/* Header tab */}
+              <div className="bg-slate-950 border-b border-slate-900 px-4 py-3 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
+                </div>
+                <div className="text-[10px] font-mono text-slate-500 flex items-center gap-1.5">
+                  <Code2 className="w-3.5 h-3.5 text-cyan-500/70" />
+                  graphs.ts
+                </div>
+                <div className="w-8" />
+              </div>
+              
+              {/* Code region */}
+              <div className="p-5 font-mono text-[11px] leading-relaxed text-slate-400 overflow-x-auto select-text">
+                <pre className="whitespace-pre">
+                  {MOCK_CODE.split('\n').map((line, idx) => (
+                    <div key={idx} className="flex gap-4">
+                      <span className="text-slate-700 text-right w-5 select-none">{idx + 1}</span>
+                      <span>
+                        {line.startsWith('//') ? (
+                          <span className="text-slate-600">{line}</span>
+                        ) : (
+                          // simple highlight
+                          line
+                            .replace(/(function|let|const|new|while|for|if|return)/g, '<span class="text-cyan-400 font-semibold">$1</span>')
+                            .replace(/(console\.log|breadthFirstSearch|console|visited)/g, '<span class="text-indigo-400">$1</span>')
+                            .replace(/(Queue|Set|Graph)/g, '<span class="text-emerald-400 font-semibold">$1</span>')
+                            .replace(/`([^`]+)`/g, '<span class="text-amber-400">`$1`</span>')
+                            .replace(/("placeholder"|'placeholder'|'graphs.ts')/g, '<span class="text-amber-400">$1</span>')
+                            .split(' ')
+                            .map((w, i) => <span key={i} dangerouslySetInnerHTML={{ __html: w + ' ' }} />)
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </pre>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer metrics */}
+          <div className="grid grid-cols-3 gap-6 border-t border-slate-900/60 pt-8">
+            <div className="space-y-1">
+              <div className="text-slate-500 font-mono text-[9px] uppercase tracking-wider flex items-center gap-1">
+                <Brain className="w-3 h-3 text-cyan-500" />
+                DSA Mastery
+              </div>
+              <p className="text-xs text-slate-300 font-medium">Progressive Tracks</p>
+            </div>
+            <div className="space-y-1">
+              <div className="text-slate-500 font-mono text-[9px] uppercase tracking-wider flex items-center gap-1">
+                <Trophy className="w-3 h-3 text-indigo-500" />
+                Streak Heatmap
+              </div>
+              <p className="text-xs text-slate-300 font-medium">GitHub-like grid</p>
+            </div>
+            <div className="space-y-1">
+              <div className="text-slate-500 font-mono text-[9px] uppercase tracking-wider flex items-center gap-1">
+                <Briefcase className="w-3 h-3 text-emerald-500" />
+                Applications
+              </div>
+              <p className="text-xs text-slate-300 font-medium">Pipeline board</p>
+            </div>
+          </div>
+
         </div>
 
-        {isLocalDev && (
-          <div className="border border-amber-500/20 bg-amber-500/5 rounded-lg p-3 text-center">
-            <span className="text-[10px] font-mono text-amber-400 uppercase tracking-wider block mb-1">Local Dev Mode Active</span>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              Vite environment is not configured with Supabase keys. Auth checks are bypassed automatically. Click "Sign in as Guest" below to start coding locally.
-            </p>
-            <button
-              onClick={() => navigate('/')}
-              className="mt-2.5 w-full py-1.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-mono text-[10px] uppercase tracking-wider border border-amber-500/25 transition-all cursor-pointer"
-            >
-              Sign in as Guest
-            </button>
-          </div>
-        )}
-
-        {/* Info alerts */}
-        {errorMsg && (
-          <div className="p-3.5 rounded border border-rose-500/25 bg-rose-500/5 text-rose-300 text-xs leading-relaxed animate-shake">
-            {errorMsg}
-          </div>
-        )}
-        {successMsg && (
-          <div className="p-3.5 rounded border border-emerald-500/25 bg-emerald-500/5 text-emerald-300 text-xs leading-relaxed">
-            {successMsg}
-          </div>
-        )}
-
-        {!isLocalDev && !forgotMode && (
-          <form onSubmit={handleEmailAuth} className="space-y-4">
+        {/* RIGHT COLUMN: Authentication workspace */}
+        <div className="flex-1 flex items-center justify-center p-8 lg:w-1/2">
+          
+          <div className="w-full max-w-[390px] bg-slate-900/30 backdrop-blur-md border border-slate-800/80 rounded-2xl p-8 shadow-2xl relative space-y-6">
             
-            {isSignUp && (
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
-                  <User className="w-4 h-4" />
-                </span>
-                <input
-                  type="text"
-                  placeholder="Full Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-xs text-slate-200 placeholder-slate-700 focus:outline-none focus:border-cyan-500 transition-all font-sans"
-                  required={isSignUp}
-                />
+            {/* Header branding on mobile view */}
+            <div className="lg:hidden flex items-center justify-center gap-2.5 mb-6">
+              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+                <Terminal className="w-4.5 h-4.5 text-cyan-400" />
               </div>
-            )}
-
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
-                <Mail className="w-4 h-4" />
+              <span className="font-mono text-xs font-bold tracking-widest text-slate-100 uppercase">
+                PREP_TRACKER
               </span>
-              <input
-                type="email"
-                placeholder="Email Address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-xs text-slate-200 placeholder-slate-700 focus:outline-none focus:border-cyan-500 transition-all font-sans"
-                required
-              />
             </div>
 
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
-                <Lock className="w-4 h-4" />
-              </span>
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-xs text-slate-200 placeholder-slate-700 focus:outline-none focus:border-cyan-500 transition-all font-sans"
-                required
-              />
+            {/* Title */}
+            <div className="space-y-2 text-center lg:text-left">
+              <h3 className="text-xl font-bold tracking-tight text-slate-100">
+                {forgotMode ? 'Reset Credentials' : isSignUp ? 'Begin Prep Journey' : 'Access Sandbox'}
+              </h3>
+              <p className="text-xs text-slate-500 font-mono">
+                {forgotMode ? 'KEY_RECOVERY_PORTAL' : isSignUp ? 'INITIALIZE_NEW_PROFILE' : 'ENTER_DEVELOPER_CREDENTIALS'}
+              </p>
             </div>
 
-            {!isSignUp && (
-              <div className="text-right">
+            {isLocalDev && (
+              <div className="border border-amber-500/20 bg-amber-500/5 rounded-xl p-4 text-center space-y-3">
+                <span className="text-[9px] font-mono text-amber-400 uppercase tracking-widest block font-bold">Local Dev Bypass Active</span>
+                <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
+                  The client is running in Guest mode (placeholders in env). Switch tabs directly or log in as guest.
+                </p>
                 <button
-                  type="button"
-                  onClick={() => setForgotMode(true)}
-                  className="text-[11px] font-mono text-slate-500 hover:text-cyan-400 uppercase tracking-wider transition-colors cursor-pointer"
+                  onClick={() => navigate('/')}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-mono text-[10px] uppercase tracking-widest border border-amber-500/25 transition-all cursor-pointer"
                 >
-                  Forgot Password?
+                  Enter as Guest
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs font-mono uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(6,182,212,0.15)] cursor-pointer"
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  {isSignUp ? 'REGISTER' : 'LOG_IN'}
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </>
-              )}
-            </button>
-          </form>
-        )}
+            {/* Error & Success info alerts */}
+            {errorMsg && (
+              <div className="p-3.5 rounded-lg border border-rose-500/20 bg-rose-500/5 text-rose-350 text-xs leading-relaxed">
+                {errorMsg}
+              </div>
+            )}
+            {successMsg && (
+              <div className="p-3.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 text-emerald-355 text-xs leading-relaxed">
+                {successMsg}
+              </div>
+            )}
 
-        {forgotMode && (
-          <form onSubmit={handleForgotPassword} className="space-y-4">
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
-                <Mail className="w-4 h-4" />
-              </span>
-              <input
-                type="email"
-                placeholder="Registered Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-xs text-slate-200 placeholder-slate-700 focus:outline-none focus:border-cyan-500 transition-all font-sans"
-                required
-              />
-            </div>
+            {!isLocalDev && !forgotMode && (
+              <form onSubmit={handleEmailAuth} className="space-y-4">
+                
+                {isSignUp && (
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-650">
+                      <User className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Display Name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-850 rounded-lg py-2.5 pl-10 pr-4 text-xs text-slate-200 placeholder-slate-700 focus:outline-none focus:border-cyan-500 transition-all font-sans"
+                      required={isSignUp}
+                    />
+                  </div>
+                )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs font-mono uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(6,182,212,0.15)] cursor-pointer"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SEND_RESET_LINK'}
-            </button>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-650">
+                    <Mail className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="email"
+                    placeholder="Email Address"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-850 rounded-lg py-2.5 pl-10 pr-4 text-xs text-slate-200 placeholder-slate-700 focus:outline-none focus:border-cyan-500 transition-all font-sans"
+                    required
+                  />
+                </div>
 
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setForgotMode(false)}
-                className="text-[11px] font-mono text-slate-500 hover:text-slate-300 uppercase tracking-wider transition-colors cursor-pointer"
-              >
-                Back to Login
-              </button>
-            </div>
-          </form>
-        )}
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-650">
+                    <Lock className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-850 rounded-lg py-2.5 pl-10 pr-4 text-xs text-slate-200 placeholder-slate-700 focus:outline-none focus:border-cyan-500 transition-all font-sans"
+                    required
+                  />
+                </div>
 
-        {!isLocalDev && !forgotMode && (
-          <div className="space-y-4">
-            <div className="relative flex py-2 items-center">
-              <div className="flex-grow border-t border-slate-850"></div>
-              <span className="flex-shrink mx-3 text-[10px] font-mono text-slate-600 uppercase tracking-wider">or continue with</span>
-              <div className="flex-grow border-t border-slate-850"></div>
-            </div>
+                {!isSignUp && (
+                  <div className="text-right">
+                    <button
+                      type="button"
+                      onClick={() => setForgotMode(true)}
+                      className="text-[10px] font-mono text-slate-550 hover:text-cyan-400 uppercase tracking-widest transition-colors cursor-pointer"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                )}
 
-            <button
-              type="button"
-              onClick={handleGoogleLogin}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-900 text-slate-300 hover:text-slate-100 hover:border-slate-700 text-xs font-mono uppercase tracking-wider transition-all cursor-pointer"
-            >
-              <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.472 0-6.29-2.818-6.29-6.29s2.818-6.29 6.29-6.29c1.635 0 3.107.622 4.225 1.635L21.232 4.4A11.96 11.96 0 0012.24 0C5.48 0 0 5.48 0 12.24s5.48 12.24 12.24 12.24c6.76 0 12.24-5.48 12.24-12.24 0-.832-.083-1.635-.24-2.41H12.24z"/>
-              </svg>
-              Google Account
-            </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs font-mono uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(6,182,212,0.15)] cursor-pointer"
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      {isSignUp ? 'INITIALIZE_PREP' : 'LAUNCH_SANDBOX'}
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {forgotMode && (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-650">
+                    <Mail className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="email"
+                    placeholder="Registered Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-850 rounded-lg py-2.5 pl-10 pr-4 text-xs text-slate-200 placeholder-slate-700 focus:outline-none focus:border-cyan-500 transition-all font-sans"
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs font-mono uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(6,182,212,0.15)] cursor-pointer"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SEND_RESET_LINK'}
+                </button>
+
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setForgotMode(false)}
+                    className="text-[10px] font-mono text-slate-500 hover:text-slate-350 uppercase tracking-widest transition-colors cursor-pointer"
+                  >
+                    Back to Login
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {!isLocalDev && !forgotMode && (
+              <div className="space-y-4">
+                <div className="relative flex py-2 items-center">
+                  <div className="flex-grow border-t border-slate-850"></div>
+                  <span className="flex-shrink mx-3 text-[9px] font-mono text-slate-600 uppercase tracking-wider">or continue with</span>
+                  <div className="flex-grow border-t border-slate-850"></div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-900 text-slate-300 hover:text-slate-100 hover:border-slate-700 text-xs font-mono uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.472 0-6.29-2.818-6.29-6.29s2.818-6.29 6.29-6.29c1.635 0 3.107.622 4.225 1.635L21.232 4.4A11.96 11.96 0 0012.24 0C5.48 0 0 5.48 0 12.24s5.48 12.24 12.24 12.24c6.76 0 12.24-5.48 12.24-12.24 0-.832-.083-1.635-.24-2.41H12.24z"/>
+                  </svg>
+                  Google Account
+                </button>
+              </div>
+            )}
+
+            {!forgotMode && (
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSignUp(!isSignUp);
+                    setErrorMsg(null);
+                    setSuccessMsg(null);
+                  }}
+                  className="text-[10px] font-mono text-slate-550 hover:text-cyan-400 uppercase tracking-widest transition-colors cursor-pointer"
+                >
+                  {isSignUp ? 'Already registered? Sign In' : 'Create new workspace profile'}
+                </button>
+              </div>
+            )}
+            
           </div>
-        )}
+        </div>
 
-        {!forgotMode && (
-          <div className="text-center pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setErrorMsg(null);
-                setSuccessMsg(null);
-              }}
-              className="text-[11px] font-mono text-slate-500 hover:text-cyan-400 uppercase tracking-wider transition-colors cursor-pointer"
-            >
-              {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-            </button>
-          </div>
-        )}
-        
       </div>
     </div>
   );

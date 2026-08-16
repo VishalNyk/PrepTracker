@@ -1300,13 +1300,6 @@ export const Topics: React.FC = () => {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => setIsNoteModalMaximized(prev => !prev)}
-                  className="rounded border border-slate-800 bg-slate-900/80 p-2 text-slate-300 transition-colors hover:border-cyan-500 hover:text-cyan-300 cursor-pointer"
-                  title={isNoteModalMaximized ? 'Restore view' : 'Maximize'}
-                >
-                  {isNoteModalMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                </button>
-                <button
                   onClick={handleCloseModalWithSave}
                   className="rounded border border-slate-800 bg-slate-900/80 p-2 text-slate-300 transition-colors hover:border-rose-500 hover:text-rose-300 cursor-pointer"
                   title="Close and save workspace"

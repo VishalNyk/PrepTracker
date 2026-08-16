@@ -1,19 +1,35 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
+import { createClient } from '@supabase/supabase-js';
 
 const prisma = new PrismaClient();
 
-export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
-  const secret = process.env.SUPABASE_JWT_SECRET;
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
 
-  if (!secret || secret.includes('placeholder') || secret.includes('palceholder') || secret === '') {
-    // Local development mode fallback: bypass JWT signature checks
+// Safely detect placeholder credentials to support local guest mode bypass
+const isPlaceholder = 
+  !supabaseUrl || 
+  !supabaseAnonKey ||
+  supabaseUrl.includes('placeholder') || 
+  supabaseUrl.includes('palceholder') ||
+  supabaseAnonKey.includes('placeholder') ||
+  supabaseAnonKey.includes('palceholder') ||
+  supabaseUrl.includes('your_supabase') ||
+  supabaseAnonKey.includes('your_supabase');
+
+// Initialize supabase client if configured, otherwise remain null for local guest mode
+const supabase = isPlaceholder ? null : createClient(supabaseUrl, supabaseAnonKey);
+
+export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
+  // 1. Check for local dev bypass FIRST
+  if (!supabase) {
     (req as any).userId = null;
     (req as any).user = null;
     return next();
   }
 
+  // 2. Only enforce authorization if JWT is configured
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Authorization token required' });
@@ -22,29 +38,32 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
   const token = authHeader.split(' ')[1];
 
   try {
-    // Verify the Supabase JWT signature (HS256)
-    const decoded = jwt.verify(token, secret) as any;
+    // Verify using Supabase SDK directly (supports both HS256 and ES256 automatically!)
+    const { data: { user }, error } = await supabase.auth.getUser(token);
     
-    // Supabase places the auth user ID in the 'sub' claim
-    const supabaseUserId = decoded.sub;
-    const email = decoded.email;
-    const name = decoded.user_metadata?.full_name || decoded.name || null;
+    if (error || !user) {
+      console.error('[Auth Middleware] Verification failed:', error?.message || 'No user found');
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    const supabaseUserId = user.id;
+    const email = user.email;
+    const name = user.user_metadata?.full_name || null;
 
     if (!supabaseUserId) {
       return res.status(401).json({ error: 'Invalid token payload: user ID not found.' });
     }
 
     // Sync user with our database
-    let user = await prisma.user.findUnique({
+    let localUser = await prisma.user.findUnique({
       where: { id: supabaseUserId }
     });
 
-    if (!user) {
-      // First-time login: sync profile details into our database
-      user = await prisma.user.create({
+    if (!localUser) {
+      localUser = await prisma.user.create({
         data: {
           id: supabaseUserId,
-          email: email,
+          email: email || '',
           name: name
         }
       });
@@ -52,11 +71,11 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
 
     // Attach user information to the request
     (req as any).userId = supabaseUserId;
-    (req as any).user = user;
+    (req as any).user = localUser;
 
     next();
   } catch (error: any) {
-    console.error('[Auth Middleware] Verification failed:', error.message);
+    console.error('[Auth Middleware] Exception:', error.message);
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 };
